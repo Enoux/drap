@@ -9,6 +9,7 @@
   import LogOutIcon from '@lucide/svelte/icons/log-out';
   import MailIcon from '@lucide/svelte/icons/mail';
   import UsersIcon from '@lucide/svelte/icons/users';
+  import { mergeProps } from 'bits-ui';
 
   import * as Avatar from '$lib/components/ui/avatar';
   import * as Drawer from '$lib/components/ui/drawer';
@@ -64,7 +65,7 @@
           <Sidebar.MenuItem>
             <Sidebar.MenuButton isActive={pathname === '/'} tooltipContent="Home">
               {#snippet child({ props })}
-                <a href={resolve('/')} onclick={closeMobileSidebar} {...props}>
+                <a href={resolve('/')} {...mergeProps(props, { onclick: closeMobileSidebar })}>
                   <HomeIcon class="size-5" />
                   <span>Home</span>
                 </a>
@@ -77,7 +78,10 @@
               tooltipContent="History"
             >
               {#snippet child({ props })}
-                <a href={resolve('/history/')} onclick={closeMobileSidebar} {...props}>
+                <a
+                  href={resolve('/history/')}
+                  {...mergeProps(props, { onclick: closeMobileSidebar })}
+                >
                   <ClockIcon class="size-5" />
                   <span>History</span>
                 </a>
@@ -90,7 +94,10 @@
               tooltipContent="Privacy"
             >
               {#snippet child({ props })}
-                <a href={resolve('/privacy/')} onclick={closeMobileSidebar} {...props}>
+                <a
+                  href={resolve('/privacy/')}
+                  {...mergeProps(props, { onclick: closeMobileSidebar })}
+                >
                   <LockKeyholeIcon class="size-5" />
                   <span>Privacy</span>
                 </a>
@@ -114,7 +121,10 @@
                   tooltipContent="Admin"
                 >
                   {#snippet child({ props })}
-                    <a href={resolve('/dashboard/admin/')} onclick={closeMobileSidebar} {...props}>
+                    <a
+                      href={resolve('/dashboard/admin/')}
+                      {...mergeProps(props, { onclick: closeMobileSidebar })}
+                    >
                       <Avatar.Root class="size-5">
                         <Avatar.Image
                           src={user.avatarUrl}
@@ -137,7 +147,10 @@
                     tooltipContent="Labs"
                   >
                     {#snippet child({ props })}
-                      <a href={resolve('/dashboard/labs/')} onclick={closeMobileSidebar} {...props}>
+                      <a
+                        href={resolve('/dashboard/labs/')}
+                        {...mergeProps(props, { onclick: closeMobileSidebar })}
+                      >
                         <FlaskConicalIcon class="size-5" />
                         <span>Labs</span>
                       </a>
@@ -152,8 +165,7 @@
                     {#snippet child({ props })}
                       <a
                         href={resolve('/dashboard/users/')}
-                        onclick={closeMobileSidebar}
-                        {...props}
+                        {...mergeProps(props, { onclick: closeMobileSidebar })}
                       >
                         <UsersIcon class="size-5" />
                         <span>Users</span>
@@ -169,8 +181,7 @@
                     {#snippet child({ props })}
                       <a
                         href={resolve('/dashboard/drafts/')}
-                        onclick={closeMobileSidebar}
-                        {...props}
+                        {...mergeProps(props, { onclick: closeMobileSidebar })}
                       >
                         <ClipboardListIcon class="size-5" />
                         <span>Drafts</span>
@@ -186,8 +197,7 @@
                     {#snippet child({ props })}
                       <a
                         href={resolve('/dashboard/email/')}
-                        onclick={closeMobileSidebar}
-                        {...props}
+                        {...mergeProps(props, { onclick: closeMobileSidebar })}
                       >
                         <MailIcon class="size-5" />
                         <span>Email</span>
@@ -203,7 +213,10 @@
                     tooltipContent="Lab"
                   >
                     {#snippet child({ props })}
-                      <a href={resolve('/dashboard/lab/')} onclick={closeMobileSidebar} {...props}>
+                      <a
+                        href={resolve('/dashboard/lab/')}
+                        {...mergeProps(props, { onclick: closeMobileSidebar })}
+                      >
                         <FlaskConicalIcon class="size-5" />
                         <span>Lab</span>
                       </a>
@@ -218,8 +231,7 @@
                     {#snippet child({ props })}
                       <a
                         href={resolve('/dashboard/students/')}
-                        onclick={closeMobileSidebar}
-                        {...props}
+                        {...mergeProps(props, { onclick: closeMobileSidebar })}
                       >
                         <GraduationCapIcon class="size-5" />
                         <span>Students</span>
@@ -238,8 +250,7 @@
                   {#snippet child({ props })}
                     <a
                       href={resolve('/dashboard/student/')}
-                      onclick={closeMobileSidebar}
-                      {...props}
+                      {...mergeProps(props, { onclick: closeMobileSidebar })}
                     >
                       <GraduationCapIcon class="size-5" />
                       <span>Student</span>
@@ -255,7 +266,10 @@
                     tooltipContent="Lab"
                   >
                     {#snippet child({ props })}
-                      <a href={resolve('/dashboard/lab/')} onclick={closeMobileSidebar} {...props}>
+                      <a
+                        href={resolve('/dashboard/lab/')}
+                        {...mergeProps(props, { onclick: closeMobileSidebar })}
+                      >
                         <FlaskConicalIcon class="size-5" />
                         <span>Lab</span>
                       </a>
@@ -276,8 +290,7 @@
           <Sidebar.MenuButton tooltipContent="Login">
             {#snippet child({ props })}
               <a
-                onclick={closeMobileSidebar}
-                {...props}
+                {...mergeProps(props, { onclick: closeMobileSidebar })}
                 href={resolve('/dashboard/oauth/login')}
                 class={buttonVariants({
                   variant: 'ghost',
@@ -310,9 +323,8 @@
                 }}
               >
                 <Button
-                  {...props}
+                  {...mergeProps(props, { onclick: closeMobileSidebar })}
                   type="submit"
-                  onclick={closeMobileSidebar}
                   variant="ghost"
                   class="size-full cursor-pointer justify-start rounded-md p-2 text-sm"
                 >
