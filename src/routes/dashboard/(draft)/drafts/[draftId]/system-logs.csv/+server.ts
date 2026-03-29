@@ -70,7 +70,7 @@ export async function GET({ params: { draftId: draftIdParam }, locals: { session
   const now = lightFormat(philippineTime, 'yyyy-MM-dd');
   return new Response(Papa.unparse(csvData), {
     headers: {
-      'Content-Type': 'application/csv',
+      'Content-Type': 'text/csv',
       'Content-Disposition': `attachment; filename="${now}_${draftId}_system_logs.csv"`,
     },
   });
