@@ -4,8 +4,8 @@
 
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
-
   import type { FacultyChoiceRecord } from '$lib/features/drafts/types';
+  import { resolve } from '$app/paths';
 
   interface Props {
     draftId: string;
@@ -88,7 +88,12 @@ Needs to distinguish the following events (one 'event' being a grouping of choic
     />
     <span>Show System Automation Logs</span>
   </label>
-  <Button href="/dashboard/drafts/{draftId}/system-logs.csv" download variant="outline" size="sm">
+  <Button
+    href={resolve(`/dashboard/drafts/${draftId}/system-logs.csv`)}
+    download
+    variant="outline"
+    size="sm"
+  >
     <DownloadIcon class="mr-2 size-4" />
     Export CSV
   </Button>
