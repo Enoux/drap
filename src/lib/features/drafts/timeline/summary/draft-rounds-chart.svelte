@@ -1,5 +1,15 @@
 <script lang="ts">
+  import { AreaChart } from 'layerchart';
+  import { cubicOut } from 'svelte/easing';
+  import { cumsum, max, rollup, tickStep } from 'd3-array';
+  import { format } from 'd3-format';
+  import type { MotionOptions } from 'layerchart/utils/motion.svelte';
+  import { prefersReducedMotion } from 'svelte/motion';
+  import { scalePoint } from 'd3-scale';
+
   import * as Card from '$lib/components/ui/card';
+  import * as Chart from '$lib/components/ui/chart';
+  import * as NativeSelect from '$lib/components/ui/native-select';
   import { Badge } from '$lib/components/ui/badge';
   import type { DraftAssignmentRecord, Lab } from '$lib/features/drafts/types';
 
@@ -22,299 +32,232 @@
   }: Props = $props();
 
   let chartMode = $state<'assigned' | 'remaining'>('assigned');
-
-  const PADDING_TOP = 20;
-  const PADDING_LEFT = 40;
-  const PADDING_BOTTOM = 30;
-  const PADDING_RIGHT = 20;
-
-  const CANVAS_WIDTH = 600;
-  const CANVAS_HEIGHT = 200;
-
-  const CHART_WIDTH = CANVAS_WIDTH - PADDING_LEFT - PADDING_RIGHT;
-  const CHART_HEIGHT = CANVAS_HEIGHT - PADDING_TOP - PADDING_BOTTOM;
-
   let selectedLabId = $state('');
-  let hoveredPoint = $state<{
-    label: string;
-    count: number;
-    remaining: number;
-    x: number;
-    y: number;
-  } | null>(null);
 
-  const chartFilter = $derived(
+  const filtered = $derived(
     selectedLabId === ''
       ? {
-          filteredRecords: records,
-          filteredInterventionRecords: interventionRecords,
-          filteredLotteryRecords: lotteryRecords,
-          selectedLabQuota: null,
+          records,
+          interventionRecords,
+          lotteryRecords,
+          selectedLabQuota: void 0,
         }
       : {
-          filteredRecords: records.filter(r => r.labId === selectedLabId),
-          filteredInterventionRecords: interventionRecords.filter(r => r.labId === selectedLabId),
-          filteredLotteryRecords: lotteryRecords.filter(r => r.labId === selectedLabId),
-          selectedLabQuota: labs.find(r => r.id === selectedLabId)?.quota ?? null,
+          records: records.filter(record => record.labId === selectedLabId),
+          interventionRecords: interventionRecords.filter(record => record.labId === selectedLabId),
+          lotteryRecords: lotteryRecords.filter(record => record.labId === selectedLabId),
+          selectedLabQuota: labs.find(lab => lab.id === selectedLabId)?.quota,
         },
   );
 
-  const chartData = $derived.by(() => {
-    const roundCounts: Record<number, number> = {};
-    for (let i = 1; i <= maxRounds; ++i) roundCounts[i] = 0;
-
-    for (const record of chartFilter.filteredRecords)
-      if (record.round !== null && record.round > 0)
-        roundCounts[record.round] = (roundCounts[record.round] ?? 0) + 1;
-
-    const nonZeroRounds = Object.entries(roundCounts)
-      .filter(([, count]) => count > 0)
-      .map(([round, count]) => ({ round: Number(round), count }))
-      .sort((a, b) => a.round - b.round);
-
-    const interventionCount = chartFilter.filteredInterventionRecords.length;
-    const hasInterventions = interventionCount > 0;
-    const hasLottery = chartFilter.filteredLotteryRecords.length > 0;
-    const totalPoints = nonZeroRounds.length + (hasInterventions ? 1 : 0) + (hasLottery ? 1 : 0);
-
-    const points: { label: string; type: 'round' | 'intervention' | 'lottery'; count: number }[] =
-      [];
-
-    for (const { round, count } of nonZeroRounds)
-      points.push({ label: `R${round}`, type: 'round', count });
-
-    if (hasInterventions)
-      points.push({ label: 'Interventions', type: 'intervention', count: interventionCount });
-
-    if (hasLottery)
-      points.push({
-        label: 'Lottery',
-        type: 'lottery',
-        count: chartFilter.filteredLotteryRecords.length,
-      });
-
-    const maxCount = Math.max(
-      ...nonZeroRounds.map(r => r.count),
-      interventionCount,
-      chartFilter.filteredLotteryRecords.length,
-      1,
-    );
-
-    let maxY = Math.max(maxCount, 1);
-    if (chartMode === 'remaining')
-      maxY = Math.max(
-        selectedLabId === '' || chartFilter.selectedLabQuota === null
-          ? totalStudents
-          : chartFilter.selectedLabQuota,
-        1,
-      );
-
-    return points.map((point, index) => ({
-      ...point,
-      x: PADDING_LEFT + (index / Math.max(totalPoints - 1, 1)) * CHART_WIDTH,
-      y:
-        chartMode === 'assigned'
-          ? PADDING_TOP + CHART_HEIGHT - (point.count / maxCount) * CHART_HEIGHT
-          : PADDING_TOP +
-            CHART_HEIGHT -
-            ((selectedLabId !== '' && chartFilter.selectedLabQuota !== null
-              ? Math.max(0, chartFilter.selectedLabQuota - cumulativeUpTo(index, points))
-              : Math.max(0, totalStudents - cumulativeUpTo(index, points))) /
-              maxY) *
-              CHART_HEIGHT,
-    }));
-  });
-
-  function cumulativeUpTo(
-    index: number,
-    pts: { label: string; type: 'round' | 'intervention' | 'lottery'; count: number }[],
-  ) {
-    let drafted = 0;
-    for (let i = 0; i <= index; ++i) {
-      const pt = pts[i];
-      if (typeof pt === 'undefined') throw new Error(`Expected point at index ${i}`);
-      drafted += pt.count;
-    }
-    return drafted;
-  }
-
-  const maxCount = $derived(Math.max(...chartData.map(p => p.count), 1));
-
-  const chartMax = $derived.by(() => {
-    if (chartMode === 'remaining')
-      return Math.max(
-        selectedLabId === '' || chartFilter.selectedLabQuota === null
-          ? totalStudents
-          : chartFilter.selectedLabQuota,
-        1,
-      );
-    return Math.max(maxCount, 1);
-  });
-
-  const linePath = $derived(
-    chartData.length > 0 ? `M ${chartData.map(p => `${p.x},${p.y}`).join(' L ')}` : '',
+  const capacity = $derived(
+    selectedLabId === '' || typeof filtered.selectedLabQuota === 'undefined'
+      ? totalStudents
+      : filtered.selectedLabQuota,
   );
 
-  const areaPath = $derived.by(() => {
-    const data = chartData;
-    if (data.length === 0) return '';
-    const [first] = data;
-    const last = data.at(-1);
-    if (typeof first === 'undefined' || typeof last === 'undefined')
-      throw new Error('Expected non-empty chart data');
-    return `${linePath} L ${last.x},${PADDING_TOP + CHART_HEIGHT} L ${first.x},${PADDING_TOP + CHART_HEIGHT} Z`;
-  });
+  const roundCountByNumber = $derived.by(() =>
+    rollup(
+      filtered.records.flatMap(record =>
+        typeof record.round === 'number' && record.round > 0 && record.round <= maxRounds
+          ? [record.round]
+          : [],
+      ),
+      values => values.length,
+      value => value,
+    ),
+  );
+
+  const phaseCounts = $derived.by(() => [
+    ...Array.from({ length: maxRounds }, (_, index) => {
+      const round = index + 1;
+      return {
+        phaseKey: `round-${round}`,
+        phaseLabel: `R${round}`,
+        assigned: roundCountByNumber.get(round) ?? 0,
+      };
+    }),
+    {
+      phaseKey: 'interventions',
+      phaseLabel: 'Interventions',
+      assigned: filtered.interventionRecords.length,
+    },
+    {
+      phaseKey: 'lottery',
+      phaseLabel: 'Lottery',
+      assigned: filtered.lotteryRecords.length,
+    },
+  ]);
+
+  const cumulativeAssigned = $derived(Array.from(cumsum(phaseCounts, ({ assigned }) => assigned)));
+
+  const chartPoints = $derived.by(() =>
+    phaseCounts.map((point, index) => {
+      const remaining = Math.max(capacity - (cumulativeAssigned[index] ?? 0), 0);
+      return {
+        ...point,
+        remaining,
+        value: chartMode === 'assigned' ? point.assigned : remaining,
+      };
+    }),
+  );
+
+  const assignedMax = $derived(max(phaseCounts, point => point.assigned) ?? 1);
+
+  const chartMax = $derived(chartMode === 'assigned' ? assignedMax : Math.max(capacity, 1));
+
+  const integerFormat = format('d');
 
   const yTicks = $derived.by(() => {
-    const ticks: number[] = [];
-    const step = Math.ceil(chartMax / 4);
-    if (step <= 0) return [0];
-    for (let i = 0; i <= chartMax; i += step) ticks.push(i);
-    return ticks;
+    const step = Math.max(1, tickStep(0, chartMax, 4));
+    const ticks = Array.from(
+      { length: Math.floor(chartMax / step) + 1 },
+      (_, index) => index * step,
+    );
+    if (ticks.at(-1) === chartMax) return ticks;
+    return [...ticks, chartMax];
   });
 
-  const selectedLabName = $derived(
-    selectedLabId === '' ? null : labs.find(l => l.id === selectedLabId)?.name,
-  );
+  const selectedLabName = $derived.by(() => {
+    // eslint-disable-next-line @typescript-eslint/init-declarations
+    let name: string | undefined;
+    if (selectedLabId !== '') name = labs.find(lab => lab.id === selectedLabId)?.name;
+    return name;
+  });
 
-  const chartModeLabel = $derived.by(() => {
+  const chartTitle = $derived.by(() => {
     if (chartMode === 'assigned') return 'Students assigned';
     if (selectedLabId === '') return 'Students not yet assigned';
     return 'Labs remaining quota';
   });
+
+  const activeMetricLabel = $derived.by(() => {
+    if (chartMode === 'assigned') return 'Assigned';
+    if (selectedLabId === '') return 'Not yet assigned';
+    return 'Remaining quota';
+  });
+
+  const chartConfig = $derived({
+    value: {
+      label: activeMetricLabel,
+      color: 'var(--primary)',
+    },
+  } satisfies Chart.ChartConfig);
+
+  const chartSeries = $derived([
+    {
+      key: 'value',
+      label: activeMetricLabel,
+      color: 'var(--color-value)',
+    },
+  ]);
+
+  const { chartMotion, axisMotion } = $derived<{
+    chartMotion: MotionOptions;
+    axisMotion: MotionOptions;
+  }>(
+    prefersReducedMotion.current
+      ? { chartMotion: 'none', axisMotion: 'none' }
+      : {
+          chartMotion: {
+            type: 'tween',
+            duration: 280,
+            easing: cubicOut,
+          },
+          axisMotion: {
+            type: 'tween',
+            duration: 220,
+            easing: cubicOut,
+          },
+        },
+  );
 </script>
 
-<Card.Root class="bg-linear-to-br from-muted/30 to-muted/10">
-  <Card.Header>
-    <div class="flex flex-row items-center justify-between gap-4">
-      <div>
-        <Card.Title
-          >{chartModeLabel} per phase
-          {#if typeof selectedLabName === 'undefined' || selectedLabName === null}
-            &mdash; <Badge variant="default">All labs</Badge>
+<Card.Root
+  class="overflow-hidden border-border/60 bg-linear-to-br from-muted/40 via-background to-muted/10 shadow-xs"
+>
+  <Card.Header class="gap-5">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div class="space-y-1.5 lg:flex-1">
+        <div class="flex flex-wrap items-center gap-2">
+          <Card.Title id="draft-rounds-chart-title">{chartTitle} per phase</Card.Title>
+          {#if typeof selectedLabName === 'string'}
+            <Badge id="draft-rounds-chart-lab-badge" variant="secondary">{selectedLabName}</Badge>
           {:else}
-            &mdash; <Badge variant="secondary">{selectedLabName}</Badge>
+            <Badge id="draft-rounds-chart-lab-badge" variant="default">All Labs</Badge>
           {/if}
-        </Card.Title>
-        <Card.Description
-          >Visualizes student assignments or remaining lab quota across draft phases.</Card.Description
-        >
+        </div>
+        <Card.Description>
+          Visualizes student assignments or remaining lab quota across draft phases.
+        </Card.Description>
       </div>
-      <div class="flex items-center gap-2">
-        <select
+      <div class="flex flex-col gap-2 sm:flex-row lg:shrink-0 lg:justify-end">
+        <NativeSelect.Root
+          id="draft-rounds-chart-mode"
           bind:value={chartMode}
-          class="h-8 w-40 min-w-40 rounded-md border border-border bg-background px-2 pr-8 text-sm"
+          class="w-full bg-background/80 sm:w-auto"
         >
-          <option value="assigned">Assigned</option>
-          <option value="remaining">Remaining</option>
-        </select>
-        <select
+          <NativeSelect.Option value="assigned">Assigned</NativeSelect.Option>
+          <NativeSelect.Option value="remaining">Remaining</NativeSelect.Option>
+        </NativeSelect.Root>
+        <NativeSelect.Root
+          id="draft-rounds-chart-lab"
           bind:value={selectedLabId}
-          class="h-8 w-40 min-w-40 rounded-md border border-border bg-background px-2 pr-8 text-sm"
+          class="w-full bg-background/80 sm:w-auto"
         >
-          <option value="">All Labs</option>
+          <NativeSelect.Option value="">All Labs</NativeSelect.Option>
           {#each labs as lab (lab.id)}
-            <option value={lab.id}>{lab.name}</option>
+            <NativeSelect.Option value={lab.id}>{lab.name}</NativeSelect.Option>
           {/each}
-        </select>
+        </NativeSelect.Root>
       </div>
-    </div></Card.Header
-  >
-  <Card.Content>
-    <svg viewBox="0 0 {CANVAS_WIDTH} {CANVAS_HEIGHT}" class="h-auto w-full">
-      <defs>
-        <linearGradient id="fillArea" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="5%" stop-color="var(--primary)" stop-opacity={0.3} />
-          <stop offset="95%" stop-color="var(--primary)" stop-opacity={0.05} />
-        </linearGradient>
-      </defs>
-
-      {#each yTicks as tick (tick)}
-        {@const y = PADDING_TOP + CHART_HEIGHT - (tick / chartMax) * CHART_HEIGHT}
-        <line
-          x1={PADDING_LEFT}
-          y1={y}
-          x2={CANVAS_WIDTH - PADDING_RIGHT}
-          y2={y}
-          stroke="var(--border)"
-          stroke-dasharray="4"
-        />
-        <text
-          x={PADDING_LEFT - 8}
-          y={y + 4}
-          text-anchor="end"
-          class="fill-muted-foreground text-[10px]"
-        >
-          {tick}
-        </text>
-      {/each}
-
-      <path d={areaPath} fill="url(#fillArea)" />
-
-      <path
-        d={linePath}
-        fill="none"
-        stroke="var(--primary)"
-        stroke-width="2.5"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-
-      {#each chartData as point, index (point.label)}
-        {@const remaining =
-          selectedLabId === '' || chartFilter.selectedLabQuota === null
-            ? Math.max(0, totalStudents - cumulativeUpTo(index, chartData))
-            : Math.max(0, chartFilter.selectedLabQuota - cumulativeUpTo(index, chartData))}
-        <g
-          role="button"
-          tabindex="0"
-          onmouseenter={() => (hoveredPoint = { ...point, remaining, x: point.x, y: point.y })}
-          onmouseleave={() => (hoveredPoint = null)}
-          onfocus={() => (hoveredPoint = { ...point, remaining, x: point.x, y: point.y })}
-          onblur={() => (hoveredPoint = null)}
-        >
-          <circle
-            cx={point.x}
-            cy={point.y}
-            r="6"
-            fill="var(--primary)"
-            class="cursor-pointer hover:fill-primary/80"
-          />
-        </g>
-      {/each}
-
-      {#if hoveredPoint !== null}
-        {@const tooltipX = hoveredPoint.x - 5}
-        {@const tooltipY = Math.min(hoveredPoint.y + 25, PADDING_TOP + CHART_HEIGHT - 20)}
-        <rect
-          x={tooltipX - 10}
-          y={tooltipY - 14}
-          width="30"
-          height="20"
-          rx="4"
-          fill="var(--foreground)"
-          class="fill-background/95"
-        />
-        <text
-          x={tooltipX + 5}
-          y={tooltipY}
-          text-anchor="middle"
-          class="font-small fill-foreground text-[10px]"
-        >
-          {chartMode === 'assigned' ? hoveredPoint.count : hoveredPoint.remaining}
-        </text>
-      {/if}
-
-      {#each chartData as { label, x } (label)}
-        <text
-          {x}
-          y={CANVAS_HEIGHT - 8}
-          text-anchor="middle"
-          class="fill-muted-foreground text-[10px]"
-        >
-          {label}
-        </text>
-      {/each}
-    </svg>
+    </div>
+  </Card.Header>
+  <Card.Content class="pt-0">
+    <Chart.Container id="draft-rounds-chart" config={chartConfig} class="min-h-[280px] w-full">
+      <AreaChart
+        data={chartPoints}
+        x="phaseLabel"
+        y="value"
+        xScale={scalePoint().padding(0)}
+        padding={{ top: 8, right: 10, bottom: 20, left: 20 }}
+        series={chartSeries}
+        legend={false}
+        points
+        grid
+        yDomain={[0, chartMax]}
+        props={{
+          area: {
+            fillOpacity: 0.22,
+            motion: chartMotion,
+            line: {
+              strokeWidth: 3,
+              motion: chartMotion,
+            },
+          },
+          points: {
+            r: 5.5,
+            class: 'draft-rounds-chart-point',
+            motion: chartMotion,
+          },
+          tooltip: { context: { mode: 'band' } },
+          xAxis: {
+            grid: false,
+            motion: axisMotion,
+            tickLabelProps: { dy: 8 },
+          },
+          yAxis: {
+            ticks: yTicks,
+            format: value => integerFormat(value),
+            motion: axisMotion,
+            tickLabelProps: { dx: -8 },
+          },
+        }}
+      >
+        {#snippet tooltip()}
+          <Chart.Tooltip class="draft-rounds-chart-tooltip" indicator="dot" labelKey="phaseLabel" />
+        {/snippet}
+      </AreaChart>
+    </Chart.Container>
   </Card.Content>
 </Card.Root>
