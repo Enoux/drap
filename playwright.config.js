@@ -5,6 +5,7 @@ export default defineConfig({
   testDir: './tests',
   outputDir: './output',
   fullyParallel: false,
+  reporter: 'dot', // Emits fewer tokens when dumping to the logs.
   webServer: {
     // Assumes that `pnpm build` has already been run.
     command: 'pnpm preview',
