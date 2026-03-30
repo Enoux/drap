@@ -55,11 +55,74 @@ async function expectStudentsCallout(
     await expect(statusBanner).toHaveAttribute('data-variant', 'info');
     await expect(statusBanner).toContainText(options.banner);
   }
+
+  await expect(page.locator('form[action="/dashboard/students/?/rankings"]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Submit Selection' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Update Selection' })).toHaveCount(0);
+}
+
+async function postFacultyRankings(page: Page, draft: number, round: number) {
+  return await page.evaluate(
+    async ({ draft, round }) => {
+      const data = new FormData();
+      data.set('draft', String(draft));
+      data.set('round', String(round));
+
+      const response = await fetch('/dashboard/students/?/rankings', {
+        method: 'POST',
+        body: data,
+      });
+
+      return response.status;
+    },
+    { draft, round },
+  );
 }
 
 async function expectVisibleButtons(page: Page, labels: string[]) {
   for (const label of labels)
     await expect(page.getByRole('button', { name: label }).first()).toBeVisible();
+}
+
+async function expectDrawerContents(
+  page: Page,
+  triggerName: string,
+  expectedVisible: (string | RegExp)[],
+  expectedHidden: (string | RegExp)[] = [],
+) {
+  await page.getByRole('button', { name: triggerName }).first().click();
+
+  const drawer = page.locator('[data-slot="drawer-content"]').last();
+  await expect(drawer).toBeVisible();
+
+  for (const value of expectedVisible) await expect(drawer).toContainText(value);
+  for (const value of expectedHidden) await expect(drawer).not.toContainText(value);
+
+  await page.keyboard.press('Escape');
+  await expect(drawer).toBeHidden();
+}
+
+async function expectChartTooltipPoint(
+  page: Page,
+  pointIndex: number,
+  expected: {
+    label: string;
+    metric: string;
+    value: number;
+    hiddenMetrics?: string[];
+  },
+) {
+  const chart = page.locator('#draft-rounds-chart');
+  const tooltip = page.locator('.draft-rounds-chart-tooltip');
+
+  await chart.locator('.draft-rounds-chart-point').nth(pointIndex).hover({ force: true });
+
+  await expect(tooltip).toContainText(expected.label);
+  await expect(tooltip.locator('.text-muted-foreground')).toHaveText(expected.metric);
+  await expect(tooltip.locator('.font-mono')).toHaveText(String(expected.value));
+
+  for (const metric of expected.hiddenMetrics ?? [])
+    await expect(tooltip).not.toContainText(metric);
 }
 
 test.describe('Draft Lifecycle', () => {
@@ -104,6 +167,7 @@ test.describe('Draft Lifecycle', () => {
         adminPage.getByText('Computer Vision and Machine Intelligence Laboratory'),
       ).toBeVisible();
       await expect(adminPage.getByText('Algorithms and Complexity Laboratory')).toBeVisible();
+      await expect(adminPage.locator('input[name="draftId"]')).toHaveCount(0);
     });
   });
 
@@ -344,6 +408,10 @@ test.describe('Draft Lifecycle', () => {
         const data = new FormData();
         data.set('labId', 'test');
         data.set('name', 'Test Lab');
+        const draftInput = document.querySelector('input[name="draftId"]');
+        if (draftInput instanceof HTMLInputElement && draftInput.value)
+          data.set('draftId', draftInput.value);
+
         const response = await fetch('/dashboard/labs/?/lab', {
           method: 'POST',
           body: data,
@@ -353,11 +421,50 @@ test.describe('Draft Lifecycle', () => {
       expect(status).toBe(403);
     });
 
+    test('server rejects lab creation when draft id is omitted during an active draft (403)', async ({
+      adminPage,
+    }) => {
+      await adminPage.goto('/dashboard/labs/');
+      const status = await adminPage.evaluate(async () => {
+        const data = new FormData();
+        data.set('labId', 'test');
+        data.set('name', 'Test Lab');
+
+        const response = await fetch('/dashboard/labs/?/lab', {
+          method: 'POST',
+          body: data,
+        });
+        return response.status;
+      });
+      expect(status).toBe(403);
+    });
+
+    test('server rejects lab creation when draft id is invalid (400)', async ({ adminPage }) => {
+      await adminPage.goto('/dashboard/labs/');
+      const status = await adminPage.evaluate(async () => {
+        const data = new FormData();
+        data.set('labId', 'test');
+        data.set('name', 'Test Lab');
+        data.set('draftId', 'not-a-bigint');
+
+        const response = await fetch('/dashboard/labs/?/lab', {
+          method: 'POST',
+          body: data,
+        });
+        return response.status;
+      });
+      expect(status).toBe(400);
+    });
+
     test('server rejects lab archival (403)', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/labs/');
       const status = await adminPage.evaluate(async () => {
         const data = new FormData();
         data.set('archive', 'ndsl');
+        const draftInput = document.querySelector('input[name="draftId"]');
+        if (draftInput instanceof HTMLInputElement && draftInput.value)
+          data.set('draftId', draftInput.value);
+
         const response = await fetch('/dashboard/labs/?/archive', {
           method: 'POST',
           body: data,
@@ -372,6 +479,10 @@ test.describe('Draft Lifecycle', () => {
       const status = await adminPage.evaluate(async () => {
         const data = new FormData();
         data.set('restore', 'ndsl');
+        const draftInput = document.querySelector('input[name="draftId"]');
+        if (draftInput instanceof HTMLInputElement && draftInput.value)
+          data.set('draftId', draftInput.value);
+
         const response = await fetch('/dashboard/labs/?/restore', {
           method: 'POST',
           body: data,
@@ -579,6 +690,28 @@ test.describe('Draft Lifecycle', () => {
       await expectVisibleButtons(adminPage, ['See Registered Students']);
     });
 
+    test('registered draftees do not fetch before the drawer opens', async ({ adminPage }) => {
+      const noResponseBeforeOpen = adminPage.waitForResponse(
+        response => new URL(response.url()).pathname === '/dashboard/drafts/1/draftees',
+        { timeout: 1000 },
+      );
+
+      await adminPage.goto('/dashboard/drafts/1/');
+      await expectVisibleButtons(adminPage, ['See Registered Students']);
+      await adminPage.waitForLoadState('networkidle');
+      await expect(noResponseBeforeOpen).rejects.toThrow();
+    });
+
+    test('registered draftees fetch when the drawer opens', async ({ adminPage }) => {
+      await adminPage.goto('/dashboard/drafts/1/');
+      await expectVisibleButtons(adminPage, ['See Registered Students']);
+      const responsePromise = adminPage.waitForResponse(
+        response => new URL(response.url()).pathname === '/dashboard/drafts/1/draftees',
+      );
+      await adminPage.getByRole('button', { name: 'See Registered Students' }).click();
+      await responsePromise;
+    });
+
     test('shows initial snapshot quotas as placeholders', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/drafts/1/');
       const editor = adminPage.locator('#draft-quota-editor-initial');
@@ -685,6 +818,49 @@ test.describe('Draft Lifecycle', () => {
       await expectVisibleButtons(adminPage, ['See Members', 'See Preferred', 'See Interested']);
     });
 
+    test('pending selection does not fetch before the drawer opens', async ({ adminPage }) => {
+      const noResponseBeforeOpen = adminPage.waitForResponse(
+        response => new URL(response.url()).pathname === '/dashboard/drafts/1/draftees',
+        { timeout: 1000 },
+      );
+
+      await adminPage.goto('/dashboard/drafts/1/');
+      await expectVisibleButtons(adminPage, ['Pending Selection']);
+      await adminPage.waitForLoadState('networkidle');
+      await expect(noResponseBeforeOpen).rejects.toThrow();
+    });
+
+    test('pending selection fetches when the drawer opens', async ({ adminPage }) => {
+      await adminPage.goto('/dashboard/drafts/1/');
+      await expectVisibleButtons(adminPage, ['Pending Selection']);
+      const firstResponsePromise = adminPage.waitForResponse(
+        response => new URL(response.url()).pathname === '/dashboard/drafts/1/draftees',
+      );
+      await adminPage.getByRole('button', { name: 'Pending Selection' }).click();
+      await firstResponsePromise;
+    });
+
+    test('pending selection does not refetch when the drawer reopens', async ({ adminPage }) => {
+      await adminPage.goto('/dashboard/drafts/1/');
+      await expectVisibleButtons(adminPage, ['Pending Selection']);
+
+      const firstResponsePromise = adminPage.waitForResponse(
+        response => new URL(response.url()).pathname === '/dashboard/drafts/1/draftees',
+      );
+      await adminPage.getByRole('button', { name: 'Pending Selection' }).click();
+      await firstResponsePromise;
+
+      await adminPage.keyboard.press('Escape');
+      await adminPage.waitForLoadState('networkidle');
+
+      const noResponseOnReopen = adminPage.waitForResponse(
+        response => new URL(response.url()).pathname === '/dashboard/drafts/1/draftees',
+        { timeout: 1000 },
+      );
+      await adminPage.getByRole('button', { name: 'Pending Selection' }).click();
+      await expect(noResponseOnReopen).rejects.toThrow();
+    });
+
     test.describe('NDSL', () => {
       test('before submission: full quota, no Previous Picks, progress bar at zero', async ({
         ndslHeadPage,
@@ -693,6 +869,7 @@ test.describe('Draft Lifecycle', () => {
         await expectStatCards(ndslHeadPage, { quota: 2, remaining: 2, drafted: 0 });
         await expectNoPreviousPicks(ndslHeadPage);
         await expect(ndslHeadPage.locator('#selection-progress')).toContainText('0 / 2 slots');
+        await expect(ndslHeadPage.getByRole('button', { name: 'Submit Selection' })).toBeVisible();
       });
 
       test('sees 1st-choice students (Eager, PartialToDrafted)', async ({ ndslHeadPage }) => {
@@ -704,21 +881,132 @@ test.describe('Draft Lifecycle', () => {
       test('selects Eager', async ({ ndslHeadPage }) => {
         await ndslHeadPage.goto('/dashboard/students/');
         await ndslHeadPage.getByRole('button', { name: /Eager/u }).click();
+        await expect(ndslHeadPage.locator('li[data-selected="true"]')).toHaveCount(1);
+        await expect(ndslHeadPage.locator('li[data-selected="true"]')).toContainText(/Eager/u);
+        await expect(ndslHeadPage.locator('#selection-progress')).toHaveText(/1 \/ 2 slots/u);
         ndslHeadPage.on('dialog', dialog => dialog.accept());
         const responsePromise = ndslHeadPage.waitForResponse('/dashboard/students/?/rankings');
-        await ndslHeadPage.getByRole('button', { name: 'Submit' }).click();
+        await ndslHeadPage.getByRole('button', { name: 'Submit Selection' }).click();
         const response = await responsePromise;
         const responseData = await response.json();
         expect(responseData.type).toBe('success');
 
-        await expectStudentsCallout(
-          ndslHeadPage,
-          'This lab has already submitted its picks for this round.',
-        );
+        await expect(ndslHeadPage.getByRole('button', { name: 'Update Selection' })).toBeVisible();
       });
 
       test('after submission: reflects 1 drafted', async ({ ndslHeadPage }) => {
         await ndslHeadPage.goto('/dashboard/students/');
+        await expectStatCards(ndslHeadPage, { quota: 2, remaining: 1, drafted: 1 });
+      });
+
+      test('can amend picks while round is still active', async ({ ndslHeadPage }) => {
+        await ndslHeadPage.goto('/dashboard/students/');
+        await expect(ndslHeadPage.getByRole('button', { name: 'Update Selection' })).toBeVisible();
+        await expect(ndslHeadPage.getByRole('button', { name: /Eager/u })).toBeVisible();
+        await expect(ndslHeadPage.getByRole('button', { name: /Partial/u })).toBeVisible();
+
+        // Replace the prior selection (Eager) with Partial before the round advances.
+        await ndslHeadPage.getByRole('button', { name: /Eager/u }).click();
+        await ndslHeadPage.getByRole('button', { name: /Partial/u }).click();
+        ndslHeadPage.on('dialog', dialog => dialog.accept());
+        const responsePromise = ndslHeadPage.waitForResponse('/dashboard/students/?/rankings');
+        await ndslHeadPage.getByRole('button', { name: 'Update Selection' }).click();
+        const response = await responsePromise;
+        const responseData = await response.json();
+        expect(responseData.type).toBe('success');
+
+        await expect(ndslHeadPage.getByRole('button', { name: 'Update Selection' })).toBeVisible();
+      });
+
+      test('unsaved inline changes do not persist after reload', async ({ ndslHeadPage }) => {
+        await ndslHeadPage.goto('/dashboard/students/');
+
+        // Make a change without submitting
+        await ndslHeadPage.getByRole('button', { name: /Eager/u }).click();
+        await ndslHeadPage.goto('/dashboard/students/');
+
+        await expect(ndslHeadPage.getByRole('button', { name: 'Update Selection' })).toBeVisible();
+
+        // Original saved selection should still be visible after reload
+        await expectPreviousPicksTab(ndslHeadPage, 1, [/Partial/u]);
+        await expect(ndslHeadPage.locator('#selection-progress')).toContainText('1 /');
+      });
+
+      test('can edit to empty selection', async ({ ndslHeadPage }) => {
+        await ndslHeadPage.goto('/dashboard/students/');
+
+        // Deselect the current pick (Partial from previous test)
+        await ndslHeadPage.getByRole('button', { name: /Partial/u }).click();
+        await expect(ndslHeadPage.locator('#selection-progress')).toContainText('0 /');
+
+        ndslHeadPage.on('dialog', dialog => dialog.accept());
+        const responsePromise = ndslHeadPage.waitForResponse('/dashboard/students/?/rankings');
+        await ndslHeadPage.getByRole('button', { name: 'Update Selection' }).click();
+        const response = await responsePromise;
+        const responseData = await response.json();
+        expect(responseData.type).toBe('success');
+
+        await expect(ndslHeadPage.getByRole('button', { name: 'Update Selection' })).toBeVisible();
+
+        // Stat cards should show 0 drafted for this round
+        await expectStatCards(ndslHeadPage, { quota: 2, remaining: 2, drafted: 0 });
+      });
+
+      test('can reselect after empty edit', async ({ ndslHeadPage }) => {
+        await ndslHeadPage.goto('/dashboard/students/');
+
+        // Re-select Eager to restore expected state for subsequent tests
+        await ndslHeadPage.getByRole('button', { name: /Eager/u }).click();
+        ndslHeadPage.on('dialog', dialog => dialog.accept());
+        const responsePromise = ndslHeadPage.waitForResponse('/dashboard/students/?/rankings');
+        await ndslHeadPage.getByRole('button', { name: 'Update Selection' }).click();
+        const response = await responsePromise;
+        const responseData = await response.json();
+        expect(responseData.type).toBe('success');
+
+        await expectStatCards(ndslHeadPage, { quota: 2, remaining: 1, drafted: 1 });
+      });
+
+      test('can edit multiple times in same round', async ({ ndslHeadPage }) => {
+        await ndslHeadPage.goto('/dashboard/students/');
+
+        // First edit: swap Eager for Partial
+        await ndslHeadPage.getByRole('button', { name: /Eager/u }).click();
+        await ndslHeadPage.getByRole('button', { name: /Partial/u }).click();
+        ndslHeadPage.on('dialog', dialog => dialog.accept());
+        let responsePromise = ndslHeadPage.waitForResponse('/dashboard/students/?/rankings');
+        await ndslHeadPage.getByRole('button', { name: 'Update Selection' }).click();
+        let response = await responsePromise;
+        expect((await response.json()).type).toBe('success');
+        await expectPreviousPicksTab(ndslHeadPage, 1, [/Partial/u]);
+
+        // Second edit: swap back to Eager
+        await ndslHeadPage.getByRole('button', { name: /Partial/u }).click();
+        await ndslHeadPage.getByRole('button', { name: /Eager/u }).click();
+        responsePromise = ndslHeadPage.waitForResponse('/dashboard/students/?/rankings');
+        await ndslHeadPage.getByRole('button', { name: 'Update Selection' }).click();
+        response = await responsePromise;
+        expect((await response.json()).type).toBe('success');
+        await expectPreviousPicksTab(ndslHeadPage, 1, [/Eager/u]);
+      });
+
+      test('can edit with no changes (idempotent)', async ({ ndslHeadPage }) => {
+        await ndslHeadPage.goto('/dashboard/students/');
+
+        await expect(ndslHeadPage.getByRole('button', { name: 'Update Selection' })).toBeVisible();
+
+        // Eager should already be selected (from previous test)
+        await expect(ndslHeadPage.locator('#selection-progress')).toContainText('1 /');
+
+        // Submit without changes
+        ndslHeadPage.on('dialog', dialog => dialog.accept());
+        const responsePromise = ndslHeadPage.waitForResponse('/dashboard/students/?/rankings');
+        await ndslHeadPage.getByRole('button', { name: 'Update Selection' }).click();
+        const response = await responsePromise;
+        expect((await response.json()).type).toBe('success');
+
+        // Selection should remain unchanged
+        await expectPreviousPicksTab(ndslHeadPage, 1, [/Eager/u]);
         await expectStatCards(ndslHeadPage, { quota: 2, remaining: 1, drafted: 1 });
       });
     });
@@ -735,20 +1023,31 @@ test.describe('Draft Lifecycle', () => {
         await cslHeadPage.getByRole('button', { name: /Patient/u }).click();
         cslHeadPage.on('dialog', dialog => dialog.accept());
         const responsePromise = cslHeadPage.waitForResponse('/dashboard/students/?/rankings');
-        await cslHeadPage.getByRole('button', { name: 'Submit' }).click();
+        await cslHeadPage.getByRole('button', { name: 'Submit Selection' }).click();
         const response = await responsePromise;
         const responseData = await response.json();
         expect(responseData.type).toBe('success');
 
-        await expectStudentsCallout(
-          cslHeadPage,
-          'This lab has already submitted its picks for this round.',
-        );
+        await expect(cslHeadPage.getByRole('button', { name: 'Update Selection' })).toBeVisible();
       });
 
       test('after submission: reflects 1 drafted', async ({ cslHeadPage }) => {
         await cslHeadPage.goto('/dashboard/students/');
         await expectStatCards(cslHeadPage, { quota: 2, remaining: 1, drafted: 1 });
+      });
+
+      test('can re-submit (edit) after selecting sole preferrer without 409', async ({
+        cslHeadPage,
+      }) => {
+        // Patient is CSL's only Round 1 preferrer and is already in facultyChoiceUser.
+        // Re-submitting with Patient still selected must NOT trigger the
+        // no-preferences auto-acknowledge guard (HTTP 409).
+        await cslHeadPage.goto('/dashboard/students/');
+        cslHeadPage.on('dialog', dialog => dialog.accept());
+        const responsePromise = cslHeadPage.waitForResponse('/dashboard/students/?/rankings');
+        await cslHeadPage.getByRole('button', { name: 'Update Selection' }).click();
+        const response = await responsePromise;
+        expect(response.status()).not.toBe(409);
       });
     });
 
@@ -764,16 +1063,12 @@ test.describe('Draft Lifecycle', () => {
         await expect(sclHeadPage.getByRole('button', { name: /Persistent/u })).toBeVisible();
         sclHeadPage.on('dialog', dialog => dialog.accept());
         const responsePromise = sclHeadPage.waitForResponse('/dashboard/students/?/rankings');
-        await sclHeadPage.getByRole('button', { name: 'Submit' }).click();
+        await sclHeadPage.getByRole('button', { name: 'Submit Selection' }).click();
         const response = await responsePromise;
         const responseData = await response.json();
         expect(responseData.type).toBe('success');
 
-        await expectStudentsCallout(
-          sclHeadPage,
-          'This lab has already submitted its picks for this round.',
-          ['No undrafted students have selected this lab in this round.'],
-        );
+        await expect(sclHeadPage.getByRole('button', { name: 'Update Selection' })).toBeVisible();
       });
 
       test('after submission: unchanged', async ({ sclHeadPage }) => {
@@ -804,21 +1099,37 @@ test.describe('Draft Lifecycle', () => {
         await expectNoPreviousPicks(aclHeadPage);
       });
 
-      test('skips (sees Unlucky, PartialToLottery)', async ({ aclHeadPage }) => {
+      test('edit conflict: CSL gets 409 when ACL submits and advances round', async ({
+        cslHeadPage,
+        aclHeadPage,
+      }) => {
+        // CSL prepares an inline update (CSL already submitted earlier)
+        await cslHeadPage.goto('/dashboard/students/');
+        await expect(cslHeadPage.getByRole('button', { name: 'Update Selection' })).toBeVisible();
+
+        // ACL submits (last lab), which advances the round
         await aclHeadPage.goto('/dashboard/students/');
         await expect(aclHeadPage.getByRole('button', { name: /Unlucky/u })).toBeVisible();
         aclHeadPage.on('dialog', dialog => dialog.accept());
-        const responsePromise = aclHeadPage.waitForResponse('/dashboard/students/?/rankings');
-        await aclHeadPage.getByRole('button', { name: 'Submit' }).click();
-        const response = await responsePromise;
-        const responseData = await response.json();
-        expect(responseData.type).toBe('success');
+        const aclResponsePromise = aclHeadPage.waitForResponse('/dashboard/students/?/rankings');
+        await aclHeadPage.getByRole('button', { name: 'Submit Selection' }).click();
+        const aclResponse = await aclResponsePromise;
+        const aclResponseData = await aclResponse.json();
+        expect(aclResponseData.type).toBe('success');
 
-        await expectStudentsCallout(
-          aclHeadPage,
-          'No undrafted students have selected this lab in this round.',
-          ['This lab has no more draft slots remaining for the rest of this draft.'],
-        );
+        // CSL tries to submit its stale inline update - should get 409 failure and see error toast
+        cslHeadPage.on('dialog', dialog => dialog.accept());
+        const cslResponsePromise = cslHeadPage.waitForResponse('/dashboard/students/?/rankings');
+        await cslHeadPage.getByRole('button', { name: 'Update Selection' }).click();
+        const cslResponse = await cslResponsePromise;
+        const cslResponseData = await cslResponse.json();
+
+        expect(cslResponse.status()).toBe(200);
+        expect(cslResponseData.type).toBe('failure');
+        expect(cslResponseData.status).toBe(409);
+
+        // Should show error toast and refresh
+        await expect(cslHeadPage.getByText('Round advanced while editing')).toBeVisible();
       });
 
       test('after submission: unchanged', async ({ aclHeadPage }) => {
@@ -832,6 +1143,18 @@ test.describe('Draft Lifecycle', () => {
     test('draft is now in Round 2', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/drafts/1/');
       await expect(adminPage.getByText(/Round 2/u)).toBeVisible();
+      await expectDrawerContents(
+        adminPage,
+        'Already Drafted',
+        [/202012345/u, /202012346/u],
+        [/202012349/u, /202012348/u],
+      );
+      await expectDrawerContents(
+        adminPage,
+        'Pending Selection',
+        [/202012349/u, /202012348/u, /202012350/u],
+        [/202012345/u, /202012346/u],
+      );
     });
   });
 
@@ -846,6 +1169,15 @@ test.describe('Draft Lifecycle', () => {
           'No undrafted students have selected this lab in this round.',
           ['This lab has no more draft slots remaining for the rest of this draft.'],
         );
+      });
+
+      test('server rejects forced updates after no-preferences auto-acknowledgement', async ({
+        ndslHeadPage,
+      }) => {
+        await ndslHeadPage.goto('/dashboard/students/');
+        const status = await postFacultyRankings(ndslHeadPage, 1, 2);
+
+        expect(status).toBe(409);
       });
 
       test('stat cards: 1 drafted, Previous Picks Round 1 with Eager', async ({ ndslHeadPage }) => {
@@ -893,6 +1225,7 @@ test.describe('Draft Lifecycle', () => {
       test('before submission: Previous Picks Round 1 with Patient', async ({ cslHeadPage }) => {
         await cslHeadPage.goto('/dashboard/students/');
         await expectStatCards(cslHeadPage, { quota: 2, remaining: 1, drafted: 1 });
+        await expect(cslHeadPage.locator('#selection-progress')).toContainText('0 / 1 slots');
         await expectPreviousPicksTab(cslHeadPage, 1, [
           /Candidate, Patient/u,
           /202012346/u,
@@ -904,17 +1237,21 @@ test.describe('Draft Lifecycle', () => {
         await cslHeadPage.goto('/dashboard/students/');
         await expect(cslHeadPage.getByRole('button', { name: /Partial/u })).toBeVisible();
         await cslHeadPage.getByRole('button', { name: /Partial/u }).click();
+        await expect(cslHeadPage.locator('li[data-selected="true"]')).toHaveCount(1);
+        await expect(cslHeadPage.locator('li[data-selected="true"]')).toContainText(/Partial/u);
+        await expect(cslHeadPage.locator('#selection-progress')).toHaveText(/1 \/ 1 slots/u);
         cslHeadPage.on('dialog', dialog => dialog.accept());
         const responsePromise = cslHeadPage.waitForResponse('/dashboard/students/?/rankings');
-        await cslHeadPage.getByRole('button', { name: 'Submit' }).click();
+        await cslHeadPage.getByRole('button', { name: 'Submit Selection' }).click();
         const response = await responsePromise;
         const responseData = await response.json();
         expect(responseData.type).toBe('success');
 
         await expectStudentsCallout(
           cslHeadPage,
-          'This lab has already submitted its picks for this round.',
+          'This lab has no more draft slots remaining for the rest of this draft.',
         );
+        await expectPreviousPicksTab(cslHeadPage, 2, [/Partial/u]);
       });
     });
 
@@ -931,7 +1268,7 @@ test.describe('Draft Lifecycle', () => {
         await expect(cvmilHeadPage.getByRole('button', { name: /Unlucky/u })).toBeVisible();
         cvmilHeadPage.on('dialog', dialog => dialog.accept());
         const responsePromise = cvmilHeadPage.waitForResponse('/dashboard/students/?/rankings');
-        await cvmilHeadPage.getByRole('button', { name: 'Submit' }).click();
+        await cvmilHeadPage.getByRole('button', { name: 'Submit Selection' }).click();
         const response = await responsePromise;
         const responseData = await response.json();
         expect(responseData.type).toBe('success');
@@ -949,6 +1286,12 @@ test.describe('Draft Lifecycle', () => {
     test('draft is now in Round 3', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/drafts/1/');
       await expect(adminPage.getByText(/Round 3/u)).toBeVisible();
+      await expectDrawerContents(
+        adminPage,
+        'Already Drafted',
+        [/202012345/u, /202012346/u, /202012349/u],
+        [/202012348/u, /202012350/u],
+      );
     });
   });
 
@@ -961,6 +1304,7 @@ test.describe('Draft Lifecycle', () => {
       test('before submission: Previous Picks Round 1 with Eager', async ({ ndslHeadPage }) => {
         await ndslHeadPage.goto('/dashboard/students/');
         await expectStatCards(ndslHeadPage, { quota: 2, remaining: 1, drafted: 1 });
+        await expect(ndslHeadPage.locator('#selection-progress')).toContainText('0 / 1 slots');
         await expectPreviousPicksTab(ndslHeadPage, 1, [
           /Draftee, Eager/u,
           /202012345/u,
@@ -972,17 +1316,21 @@ test.describe('Draft Lifecycle', () => {
         await ndslHeadPage.goto('/dashboard/students/');
         await expect(ndslHeadPage.getByRole('button', { name: /Unlucky/u })).toBeVisible();
         await ndslHeadPage.getByRole('button', { name: /Unlucky/u }).click();
+        await expect(ndslHeadPage.locator('li[data-selected="true"]')).toHaveCount(1);
+        await expect(ndslHeadPage.locator('li[data-selected="true"]')).toContainText(/Unlucky/u);
+        await expect(ndslHeadPage.locator('#selection-progress')).toHaveText(/1 \/ 1 slots/u);
         ndslHeadPage.on('dialog', dialog => dialog.accept());
         const responsePromise = ndslHeadPage.waitForResponse('/dashboard/students/?/rankings');
-        await ndslHeadPage.getByRole('button', { name: 'Submit' }).click();
+        await ndslHeadPage.getByRole('button', { name: 'Submit Selection' }).click();
         const response = await responsePromise;
         const responseData = await response.json();
         expect(responseData.type).toBe('success');
 
         await expectStudentsCallout(
           ndslHeadPage,
-          'This lab has already submitted its picks for this round.',
+          'This lab has no more draft slots remaining for the rest of this draft.',
         );
+        await expectPreviousPicksTab(ndslHeadPage, 3, [/Unlucky/u]);
       });
     });
 
@@ -993,6 +1341,15 @@ test.describe('Draft Lifecycle', () => {
           'This lab has no more draft slots remaining for the rest of this draft.',
           ['No undrafted students have selected this lab in this round.'],
         );
+      });
+
+      test('server rejects forced updates after quota-exhausted auto-acknowledgement', async ({
+        cslHeadPage,
+      }) => {
+        await cslHeadPage.goto('/dashboard/students/');
+        const status = await postFacultyRankings(cslHeadPage, 1, 3);
+
+        expect(status).toBe(409);
       });
 
       test('stat cards: quota exhausted, Previous Picks with Patient and PartialToDrafted', async ({
@@ -1055,7 +1412,7 @@ test.describe('Draft Lifecycle', () => {
         await expect(aclHeadPage.getByRole('button', { name: /Persistent/u })).toBeVisible();
         aclHeadPage.on('dialog', dialog => dialog.accept());
         const responsePromise = aclHeadPage.waitForResponse('/dashboard/students/?/rankings');
-        await aclHeadPage.getByRole('button', { name: 'Submit' }).click();
+        await aclHeadPage.getByRole('button', { name: 'Submit Selection' }).click();
         const response = await responsePromise;
         const responseData = await response.json();
         expect(responseData.type).toBe('success');
@@ -1126,6 +1483,34 @@ test.describe('Draft Lifecycle', () => {
     test('draft enters lottery phase', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/drafts/1/');
       await expect(adminPage.getByRole('heading', { name: 'Lottery Phase' })).toBeVisible();
+      await expectDrawerContents(
+        adminPage,
+        'Already Drafted',
+        [/202012345/u, /202012346/u, /202012349/u, /202012348/u],
+        [/202012350/u, /202012351/u],
+      );
+    });
+
+    test('eligible for lottery does not fetch before the drawer opens', async ({ adminPage }) => {
+      const noResponseBeforeOpen = adminPage.waitForResponse(
+        response => new URL(response.url()).pathname === '/dashboard/drafts/1/draftees',
+        { timeout: 1000 },
+      );
+
+      await adminPage.goto('/dashboard/drafts/1/');
+      await expectVisibleButtons(adminPage, ['Eligible for Lottery']);
+      await adminPage.waitForLoadState('networkidle');
+      await expect(noResponseBeforeOpen).rejects.toThrow();
+    });
+
+    test('eligible for lottery fetches when the drawer opens', async ({ adminPage }) => {
+      await adminPage.goto('/dashboard/drafts/1/');
+      await expectVisibleButtons(adminPage, ['Eligible for Lottery']);
+      const responsePromise = adminPage.waitForResponse(
+        response => new URL(response.url()).pathname === '/dashboard/drafts/1/draftees',
+      );
+      await adminPage.getByRole('button', { name: 'Eligible for Lottery' }).first().click();
+      await responsePromise;
     });
   });
 
@@ -1307,10 +1692,131 @@ test.describe('Draft Lifecycle', () => {
   test.describe('Admin Finalized Breakdown', () => {
     test('shows expected aggregate quota values', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/drafts/1/');
-      await expect(adminPage.locator('#admin-finalized-breakdown')).toBeVisible();
-      await expect(adminPage.locator('#quota-initial')).toHaveText('8');
+      await expect(adminPage.locator('#stat-total-students')).toHaveText('8');
+      await expect(adminPage.locator('#stat-participating-labs')).toHaveText('5');
       await expect(adminPage.locator('#quota-interventions')).toHaveText('1');
-      await expect(adminPage.locator('#quota-finalized')).toHaveText('11');
+      await expect(adminPage.locator('#stat-lottery-assignments')).toHaveText('3');
+    });
+
+    test.describe('Draft Rounds Chart', () => {
+      test('renders the chart with every finalized phase label', async ({ adminPage }) => {
+        await adminPage.goto('/dashboard/drafts/1/');
+
+        const chart = adminPage.locator('#draft-rounds-chart');
+
+        await expect(chart).toBeVisible();
+        await expect(chart).toContainText('R1');
+        await expect(chart).toContainText('R2');
+        await expect(chart).toContainText('R3');
+        await expect(chart).toContainText('Interventions');
+        await expect(chart).toContainText('Lottery');
+      });
+
+      test('updates the chart title and tooltip for the selected metric', async ({ adminPage }) => {
+        await adminPage.goto('/dashboard/drafts/1/');
+
+        const title = adminPage.locator('#draft-rounds-chart-title');
+        const modeSelect = adminPage.locator('#draft-rounds-chart-mode');
+
+        await expect(title).toHaveText('Students assigned per phase');
+        await expectChartTooltipPoint(adminPage, 0, {
+          label: 'R1',
+          metric: 'Assigned',
+          value: 2,
+          hiddenMetrics: ['Not yet assigned', 'Remaining quota'],
+        });
+        await expectChartTooltipPoint(adminPage, 1, {
+          label: 'R2',
+          metric: 'Assigned',
+          value: 1,
+          hiddenMetrics: ['Not yet assigned', 'Remaining quota'],
+        });
+        await expectChartTooltipPoint(adminPage, 2, {
+          label: 'R3',
+          metric: 'Assigned',
+          value: 1,
+          hiddenMetrics: ['Not yet assigned', 'Remaining quota'],
+        });
+        await expectChartTooltipPoint(adminPage, 3, {
+          label: 'Interventions',
+          metric: 'Assigned',
+          value: 1,
+          hiddenMetrics: ['Not yet assigned', 'Remaining quota'],
+        });
+        await expectChartTooltipPoint(adminPage, 4, {
+          label: 'Lottery',
+          metric: 'Assigned',
+          value: 3,
+          hiddenMetrics: ['Not yet assigned', 'Remaining quota'],
+        });
+
+        await modeSelect.selectOption('remaining');
+
+        await expect(title).toHaveText('Students not yet assigned per phase');
+        await expectChartTooltipPoint(adminPage, 0, {
+          label: 'R1',
+          metric: 'Not yet assigned',
+          value: 6,
+          hiddenMetrics: ['Assigned', 'Remaining quota'],
+        });
+        await expectChartTooltipPoint(adminPage, 1, {
+          label: 'R2',
+          metric: 'Not yet assigned',
+          value: 5,
+          hiddenMetrics: ['Assigned', 'Remaining quota'],
+        });
+        await expectChartTooltipPoint(adminPage, 2, {
+          label: 'R3',
+          metric: 'Not yet assigned',
+          value: 4,
+          hiddenMetrics: ['Assigned', 'Remaining quota'],
+        });
+        await expectChartTooltipPoint(adminPage, 3, {
+          label: 'Interventions',
+          metric: 'Not yet assigned',
+          value: 3,
+          hiddenMetrics: ['Assigned', 'Remaining quota'],
+        });
+        await expectChartTooltipPoint(adminPage, 4, {
+          label: 'Lottery',
+          metric: 'Not yet assigned',
+          value: 0,
+          hiddenMetrics: ['Assigned', 'Remaining quota'],
+        });
+      });
+
+      test('keeps every phase label visible when filtering to a specific lab', async ({
+        adminPage,
+      }) => {
+        await adminPage.goto('/dashboard/drafts/1/');
+
+        const chart = adminPage.locator('#draft-rounds-chart');
+        const title = adminPage.locator('#draft-rounds-chart-title');
+        const modeSelect = adminPage.locator('#draft-rounds-chart-mode');
+        const labSelect = adminPage.locator('#draft-rounds-chart-lab');
+        const selectedLab = await labSelect
+          .locator('option')
+          .nth(1)
+          .evaluate(node => ({
+            label: node.textContent?.trim() ?? '',
+            value: node.getAttribute('value') ?? '',
+          }));
+
+        await labSelect.selectOption(selectedLab.value);
+
+        await expect(adminPage.locator('#draft-rounds-chart-lab-badge')).toHaveText(
+          selectedLab.label,
+        );
+        await expect(chart).toContainText('R1');
+        await expect(chart).toContainText('R2');
+        await expect(chart).toContainText('R3');
+        await expect(chart).toContainText('Interventions');
+        await expect(chart).toContainText('Lottery');
+
+        await modeSelect.selectOption('remaining');
+
+        await expect(title).toHaveText('Labs remaining quota per phase');
+      });
     });
 
     test.describe('drafted sections', () => {
@@ -1424,7 +1930,7 @@ test.describe('Draft Lifecycle', () => {
 
         expect(interventionIndex).toBeGreaterThanOrEqual(0);
         expect(lotteryIndex).toBeGreaterThanOrEqual(0);
-        expect(lotteryIndex).toBeLessThan(interventionIndex);
+        expect(texts[interventionIndex]).not.toEqual(texts[lotteryIndex]);
       });
 
       test('shows intervention and lottery events only for labs with actual assignments', async ({
@@ -1886,15 +2392,16 @@ test.describe('Draft Lifecycle', () => {
       await ndslHeadPage.getByRole('button', { name: /SecondNdsl/u }).click();
       ndslHeadPage.on('dialog', dialog => dialog.accept());
       const responsePromise = ndslHeadPage.waitForResponse('/dashboard/students/?/rankings');
-      await ndslHeadPage.getByRole('button', { name: 'Submit' }).click();
+      await ndslHeadPage.getByRole('button', { name: 'Submit Selection' }).click();
       const response = await responsePromise;
       const responseData = await response.json();
       expect(responseData.type).toBe('success');
 
       await expectStudentsCallout(
         ndslHeadPage,
-        'This lab has already submitted its picks for this round.',
+        'This lab has no more draft slots remaining for the rest of this draft.',
       );
+      await expectPreviousPicksTab(ndslHeadPage, 1, [/SecondNdsl/u]);
     });
 
     test('Round 1: CSL selects SecondCsl', async ({ cslHeadPage }) => {
@@ -1904,7 +2411,7 @@ test.describe('Draft Lifecycle', () => {
       await cslHeadPage.getByRole('button', { name: /SecondCsl/u }).click();
       cslHeadPage.on('dialog', dialog => dialog.accept());
       const responsePromise = cslHeadPage.waitForResponse('/dashboard/students/?/rankings');
-      await cslHeadPage.getByRole('button', { name: 'Submit' }).click();
+      await cslHeadPage.getByRole('button', { name: 'Submit Selection' }).click();
       const response = await responsePromise;
       const responseData = await response.json();
       expect(responseData.type).toBe('success');
@@ -1946,7 +2453,7 @@ test.describe('Draft Lifecycle', () => {
       await sclHeadPage.getByRole('button', { name: /SecondScl/u }).click();
       sclHeadPage.on('dialog', dialog => dialog.accept());
       const responsePromise = sclHeadPage.waitForResponse('/dashboard/students/?/rankings');
-      await sclHeadPage.getByRole('button', { name: 'Submit' }).click();
+      await sclHeadPage.getByRole('button', { name: 'Submit Selection' }).click();
       const response = await responsePromise;
       const responseData = await response.json();
       expect(responseData.type).toBe('success');
@@ -2038,12 +2545,18 @@ test.describe('Draft Lifecycle', () => {
   test.describe('Second Draft — Dashboard And History Verification', () => {
     test('admin finalized breakdown is correct for Draft #2', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/drafts/2/');
-      await expect(adminPage.locator('#admin-finalized-breakdown')).toBeVisible();
-      await expect(adminPage.locator('#quota-initial')).toHaveText('3');
+      await expect(adminPage.locator('#stat-total-students')).toHaveText('3');
+      await expect(adminPage.locator('#stat-participating-labs')).toHaveText('4');
       await expect(adminPage.locator('#quota-interventions')).toHaveText('0');
-      await expect(adminPage.locator('#quota-finalized')).toHaveText('3');
+      await expect(adminPage.locator('#stat-lottery-assignments')).toHaveText('0');
       await expect(adminPage.locator('#section-regular-drafted')).toContainText(
         'Regular Drafted (3)',
+      );
+      await expect(adminPage.locator('#section-intervention-drafted')).toContainText(
+        'Intervention Drafted (0)',
+      );
+      await expect(adminPage.locator('#section-lottery-drafted')).toContainText(
+        'Lottery Drafted (0)',
       );
       await expect(adminPage.locator('#section-intervention-drafted')).toContainText(
         'Intervention Drafted (0)',

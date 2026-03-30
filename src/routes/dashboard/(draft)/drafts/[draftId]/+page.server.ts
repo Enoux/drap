@@ -10,7 +10,6 @@ import {
   autoAcknowledgeLabsWithoutPreferences,
   beginDraftReview,
   concludeDraft,
-  getActiveDraftForUpdate,
   getAllowlistCountByDraft,
   getDraftAssignmentRecords,
   getDraftById,
@@ -18,7 +17,6 @@ import {
   getDraftLabQuotaLabIds,
   getDraftLabQuotaSnapshots,
   getFacultyAndStaff,
-  getFacultyChoiceRecords,
   getLabById,
   getPendingLabCountInDraft,
   getStudentCountInDraft,
@@ -35,10 +33,10 @@ import {
 } from '$lib/server/database/drizzle';
 import { db } from '$lib/server/database';
 import {
-  DraftFinalizedEvent,
-  LotteryInterventionEvent,
-  RoundStartedEvent,
-  UserAssignedEvent,
+  DraftFinalizedBatchEmailEvent,
+  LotteryInterventionBatchEmailEvent,
+  RoundStartedBatchEmailEvent,
+  UserAssignedBatchEmailEvent,
 } from '$lib/server/inngest/schema';
 import { inngest } from '$lib/server/inngest/client';
 import { Logger } from '$lib/server/telemetry/logger';
@@ -100,9 +98,8 @@ export async function load({ params, locals: { session } }) {
       error(404);
     }
 
-    const [studentCount, records, assignments, quotaSnapshots, allowlistCount] = await Promise.all([
+    const [studentCount, assignments, quotaSnapshots, allowlistCount] = await Promise.all([
       getStudentCountInDraft(db, draftId),
-      getFacultyChoiceRecords(db, draftId),
       getDraftAssignmentRecords(db, draftId),
       getDraftLabQuotaSnapshots(db, draftId),
       getAllowlistCountByDraft(db, draftId),
@@ -145,7 +142,6 @@ export async function load({ params, locals: { session } }) {
       draft: { id: draftId, ...draft },
       labs,
       studentCount,
-      records,
       finalized: {
         quota: {
           initialQuota,
@@ -251,8 +247,8 @@ export const actions = {
       const roundsToNotify: (number | null)[] = [];
       const started = await db.transaction(
         async db => {
-          const activeDraft = await getActiveDraftForUpdate(db);
-          if (typeof activeDraft === 'undefined' || activeDraft.id !== draftId) {
+          const activeDraft = await getDraftByIdForUpdate(db, draftId);
+          if (typeof activeDraft === 'undefined' || activeDraft.activePeriodEnd !== null) {
             logger.fatal('attempt to start non-active draft', void 0, {
               'draft.id': draftId.toString(),
             });
@@ -314,7 +310,7 @@ export const actions = {
       await inngest.send(
         roundsToNotify.flatMap(round =>
           facultyAndStaff.map(({ email, givenName, familyName }) =>
-            RoundStartedEvent.create({
+            RoundStartedBatchEmailEvent.create({
               draftId: Number(draftId),
               round,
               recipientEmail: email,
@@ -367,8 +363,8 @@ export const actions = {
 
       await db.transaction(
         async db => {
-          const activeDraft = await getActiveDraftForUpdate(db);
-          if (typeof activeDraft === 'undefined' || activeDraft.id !== draftId) {
+          const activeDraft = await getDraftByIdForUpdate(db, draftId);
+          if (typeof activeDraft === 'undefined' || activeDraft.activePeriodEnd !== null) {
             logger.fatal('attempt to update quota snapshots for non-active draft', void 0, {
               'draft.id': draftId.toString(),
             });
@@ -474,9 +470,9 @@ export const actions = {
       logger.debug('intervening draft with pairs', { 'draft.pair_count': pairs.length });
       const result = await db.transaction(
         async db => {
-          const activeDraft = await getActiveDraftForUpdate(db);
+          const activeDraft = await getDraftByIdForUpdate(db, draftId);
 
-          if (typeof activeDraft === 'undefined' || activeDraft.id !== draftId) {
+          if (typeof activeDraft === 'undefined' || activeDraft.activePeriodEnd !== null) {
             logger.fatal('attempt to intervene non-active draft', void 0, {
               'draft.id': draftId.toString(),
             });
@@ -527,7 +523,7 @@ export const actions = {
         ]);
         await inngest.send(
           facultyAndStaff.map(({ email, givenName, familyName }) =>
-            LotteryInterventionEvent.create({
+            LotteryInterventionBatchEmailEvent.create({
               draftId: Number(draftId),
               labId,
               labName,
@@ -579,8 +575,8 @@ export const actions = {
       try {
         await db.transaction(
           async db => {
-            const activeDraft = await getActiveDraftForUpdate(db);
-            if (typeof activeDraft === 'undefined' || activeDraft.id !== draftId) {
+            const activeDraft = await getDraftByIdForUpdate(db, draftId);
+            if (typeof activeDraft === 'undefined' || activeDraft.activePeriodEnd !== null) {
               logger.fatal('attempt to conclude non-active draft', void 0, {
                 'draft.id': draftId.toString(),
               });
@@ -687,9 +683,9 @@ export const actions = {
       let userAssignments: { userId: string; labId: string }[] = [];
       await db.transaction(
         async db => {
-          const activeDraft = await getActiveDraftForUpdate(db);
+          const activeDraft = await getDraftByIdForUpdate(db, draftId);
 
-          if (typeof activeDraft === 'undefined' || activeDraft.id !== draftId) {
+          if (typeof activeDraft === 'undefined' || activeDraft.activePeriodEnd !== null) {
             logger.fatal('attempt to finalize non-active draft', void 0, {
               'draft.id': draftId.toString(),
             });
@@ -733,7 +729,7 @@ export const actions = {
 
       await inngest.send(
         facultyAndStaff.map(({ email, givenName, familyName }) =>
-          DraftFinalizedEvent.create({
+          DraftFinalizedBatchEmailEvent.create({
             draftId: Number(draftId),
             recipientEmail: email,
             recipientName: `${givenName} ${familyName}`,
@@ -748,7 +744,7 @@ export const actions = {
           getUserById(db, userId),
         ]);
         await inngest.send(
-          UserAssignedEvent.create({
+          UserAssignedBatchEmailEvent.create({
             labId,
             labName,
             userEmail: assignedUser.email,

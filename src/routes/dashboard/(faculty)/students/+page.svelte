@@ -1,6 +1,5 @@
 <script lang="ts">
   import BanIcon from '@lucide/svelte/icons/ban';
-  import CheckCircleIcon from '@lucide/svelte/icons/check-circle';
   import CircleSlashIcon from '@lucide/svelte/icons/circle-slash';
   import Clock3Icon from '@lucide/svelte/icons/clock-3';
   import InfoIcon from '@lucide/svelte/icons/info';
@@ -88,6 +87,9 @@
       </Empty.Header>
     </Empty.Root>
   {:else}
+    {@const currentRoundSelections =
+      currRound === null ? [] : researchers.filter(({ round }) => round === currRound)}
+    {@const currentRoundSelectionIds = currentRoundSelections.map(({ id }) => id)}
     <StatCards
       {quota}
       {remainingQuota}
@@ -95,23 +97,7 @@
       {submissionSource}
       {autoAcknowledgeReason}
     />
-    {#if submissionSource === 'faculty'}
-      <Empty.Root>
-        <Empty.Media variant="icon">
-          <CheckCircleIcon class="size-5 text-muted-foreground" />
-        </Empty.Media>
-        <Empty.Header>
-          <Empty.Title>Round Already Submitted</Empty.Title>
-          <Empty.Description>
-            This lab has already submitted its picks for this round. No action is required until the
-            next one.
-          </Empty.Description>
-        </Empty.Header>
-      </Empty.Root>
-      {#if researchers.length > 0}
-        <PreviousPicks {researchers} />
-      {/if}
-    {:else if autoAcknowledgeReason === 'quota-exhausted'}
+    {#if autoAcknowledgeReason === 'quota-exhausted'}
       <Empty.Root>
         <Empty.Media variant="icon">
           <CircleSlashIcon class="size-5 text-muted-foreground" />
@@ -148,7 +134,18 @@
         {#if researchers.length > 0}
           <PreviousPicks {researchers} />
         {/if}
-        <RankingsForm draft={id} {students} {remainingQuota} />
+        {#if submissionSource === 'faculty'}
+          <RankingsForm
+            draft={id}
+            round={currRound}
+            {students}
+            remainingQuota={remainingQuota + currentRoundSelections.length}
+            initialSelectedIds={currentRoundSelectionIds}
+            hasExistingSubmission
+          />
+        {:else}
+          <RankingsForm draft={id} round={currRound} {students} {remainingQuota} />
+        {/if}
       </div>
     {/if}
   {/if}
