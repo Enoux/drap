@@ -167,6 +167,7 @@ test.describe('Draft Lifecycle', () => {
         adminPage.getByText('Computer Vision and Machine Intelligence Laboratory'),
       ).toBeVisible();
       await expect(adminPage.getByText('Algorithms and Complexity Laboratory')).toBeVisible();
+      await expect(adminPage.locator('input[name="draftId"]')).toHaveCount(0);
     });
   });
 
@@ -407,6 +408,10 @@ test.describe('Draft Lifecycle', () => {
         const data = new FormData();
         data.set('labId', 'test');
         data.set('name', 'Test Lab');
+        const draftInput = document.querySelector('input[name="draftId"]');
+        if (draftInput instanceof HTMLInputElement && draftInput.value)
+          data.set('draftId', draftInput.value);
+
         const response = await fetch('/dashboard/labs/?/lab', {
           method: 'POST',
           body: data,
@@ -416,11 +421,50 @@ test.describe('Draft Lifecycle', () => {
       expect(status).toBe(403);
     });
 
+    test('server rejects lab creation when draft id is omitted during an active draft (403)', async ({
+      adminPage,
+    }) => {
+      await adminPage.goto('/dashboard/labs/');
+      const status = await adminPage.evaluate(async () => {
+        const data = new FormData();
+        data.set('labId', 'test');
+        data.set('name', 'Test Lab');
+
+        const response = await fetch('/dashboard/labs/?/lab', {
+          method: 'POST',
+          body: data,
+        });
+        return response.status;
+      });
+      expect(status).toBe(403);
+    });
+
+    test('server rejects lab creation when draft id is invalid (400)', async ({ adminPage }) => {
+      await adminPage.goto('/dashboard/labs/');
+      const status = await adminPage.evaluate(async () => {
+        const data = new FormData();
+        data.set('labId', 'test');
+        data.set('name', 'Test Lab');
+        data.set('draftId', 'not-a-bigint');
+
+        const response = await fetch('/dashboard/labs/?/lab', {
+          method: 'POST',
+          body: data,
+        });
+        return response.status;
+      });
+      expect(status).toBe(400);
+    });
+
     test('server rejects lab archival (403)', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/labs/');
       const status = await adminPage.evaluate(async () => {
         const data = new FormData();
         data.set('archive', 'ndsl');
+        const draftInput = document.querySelector('input[name="draftId"]');
+        if (draftInput instanceof HTMLInputElement && draftInput.value)
+          data.set('draftId', draftInput.value);
+
         const response = await fetch('/dashboard/labs/?/archive', {
           method: 'POST',
           body: data,
@@ -435,6 +479,10 @@ test.describe('Draft Lifecycle', () => {
       const status = await adminPage.evaluate(async () => {
         const data = new FormData();
         data.set('restore', 'ndsl');
+        const draftInput = document.querySelector('input[name="draftId"]');
+        if (draftInput instanceof HTMLInputElement && draftInput.value)
+          data.set('draftId', draftInput.value);
+
         const response = await fetch('/dashboard/labs/?/restore', {
           method: 'POST',
           body: data,

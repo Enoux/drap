@@ -10,7 +10,6 @@ import {
   autoAcknowledgeLabsWithoutPreferences,
   beginDraftReview,
   concludeDraft,
-  getActiveDraftForUpdate,
   getAllowlistCountByDraft,
   getDraftAssignmentRecords,
   getDraftById,
@@ -248,8 +247,8 @@ export const actions = {
       const roundsToNotify: (number | null)[] = [];
       const started = await db.transaction(
         async db => {
-          const activeDraft = await getActiveDraftForUpdate(db);
-          if (typeof activeDraft === 'undefined' || activeDraft.id !== draftId) {
+          const activeDraft = await getDraftByIdForUpdate(db, draftId);
+          if (typeof activeDraft === 'undefined' || activeDraft.activePeriodEnd !== null) {
             logger.fatal('attempt to start non-active draft', void 0, {
               'draft.id': draftId.toString(),
             });
@@ -364,8 +363,8 @@ export const actions = {
 
       await db.transaction(
         async db => {
-          const activeDraft = await getActiveDraftForUpdate(db);
-          if (typeof activeDraft === 'undefined' || activeDraft.id !== draftId) {
+          const activeDraft = await getDraftByIdForUpdate(db, draftId);
+          if (typeof activeDraft === 'undefined' || activeDraft.activePeriodEnd !== null) {
             logger.fatal('attempt to update quota snapshots for non-active draft', void 0, {
               'draft.id': draftId.toString(),
             });
@@ -471,9 +470,9 @@ export const actions = {
       logger.debug('intervening draft with pairs', { 'draft.pair_count': pairs.length });
       const result = await db.transaction(
         async db => {
-          const activeDraft = await getActiveDraftForUpdate(db);
+          const activeDraft = await getDraftByIdForUpdate(db, draftId);
 
-          if (typeof activeDraft === 'undefined' || activeDraft.id !== draftId) {
+          if (typeof activeDraft === 'undefined' || activeDraft.activePeriodEnd !== null) {
             logger.fatal('attempt to intervene non-active draft', void 0, {
               'draft.id': draftId.toString(),
             });
@@ -576,8 +575,8 @@ export const actions = {
       try {
         await db.transaction(
           async db => {
-            const activeDraft = await getActiveDraftForUpdate(db);
-            if (typeof activeDraft === 'undefined' || activeDraft.id !== draftId) {
+            const activeDraft = await getDraftByIdForUpdate(db, draftId);
+            if (typeof activeDraft === 'undefined' || activeDraft.activePeriodEnd !== null) {
               logger.fatal('attempt to conclude non-active draft', void 0, {
                 'draft.id': draftId.toString(),
               });
@@ -684,9 +683,9 @@ export const actions = {
       let userAssignments: { userId: string; labId: string }[] = [];
       await db.transaction(
         async db => {
-          const activeDraft = await getActiveDraftForUpdate(db);
+          const activeDraft = await getDraftByIdForUpdate(db, draftId);
 
-          if (typeof activeDraft === 'undefined' || activeDraft.id !== draftId) {
+          if (typeof activeDraft === 'undefined' || activeDraft.activePeriodEnd !== null) {
             logger.fatal('attempt to finalize non-active draft', void 0, {
               'draft.id': draftId.toString(),
             });
