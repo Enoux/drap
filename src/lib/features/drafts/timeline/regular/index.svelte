@@ -31,7 +31,7 @@
     if (value === 'students' || value === 'labs' || value === 'logs') group = value;
   }}
 >
-  <div class="items-left flex justify-around sm:justify-normal">
+  <div class="flex justify-around sm:justify-normal">
     <Tabs.List class="w-full">
       <Tabs.Trigger value="students">
         <GraduationCapIcon class="size-5" />

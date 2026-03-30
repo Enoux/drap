@@ -127,7 +127,7 @@
 
 <div class="space-y-6">
   <!-- Header -->
-  <div class="items-left flex flex-col justify-between sm:flex-row sm:items-center">
+  <div class="flex flex-col justify-between sm:flex-row sm:items-center">
     <div>
       <h2 class="text-2xl font-bold">Draft #{draftId.toString()}</h2>
       <p class="text-muted-foreground">

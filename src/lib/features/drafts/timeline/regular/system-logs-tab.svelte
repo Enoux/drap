@@ -79,7 +79,7 @@ Needs to distinguish the following events (one 'event' being a grouping of choic
 4. Lab received no interest, was auto-skipped [null faculty email, none of the above cases]
 -->
 
-<div class="xs:items-left flex flex-col items-center justify-between gap-2 xs:mt-4 xs:flex-row">
+<div class="flex flex-col items-center justify-between gap-2 xs:mt-4 xs:flex-row">
   <label class="flex items-center space-x-2">
     <input
       class="h-4 w-4 rounded-lg border border-primary"
