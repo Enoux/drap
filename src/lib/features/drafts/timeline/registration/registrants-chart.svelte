@@ -4,14 +4,11 @@
   interface Props {
     draftCreatedAt: Date;
     registrationClosedAt: Date;
-    startedAt: Date | null;
-    requestedAt: Date;
     timelineData: { date: Date; count: number }[];
   }
 
-  const { draftCreatedAt, registrationClosedAt, startedAt, requestedAt, timelineData }: Props = $props();
+  const { draftCreatedAt, registrationClosedAt, timelineData }: Props = $props();
 
-  const endBound = $derived(startedAt ?? requestedAt);
   const yMax = $derived(max(timelineData, d => d.count) ?? 0);
 
   const width = 100;
@@ -19,9 +16,9 @@
   const padding = { top: 20, right: 20, bottom: 30, left: 40 };
 
   function getX(date: Date): number {
-    if (!date || !draftCreatedAt || !endBound) return padding.left;
+    if (!date || !draftCreatedAt) return padding.left;
     const start = draftCreatedAt.getTime();
-    const end = endBound.getTime();
+    const end = registrationClosedAt.getTime();
     const range = end - start;
     if (range === 0) return padding.left;
     return padding.left + ((date.getTime() - start) / range) * (width - padding.left - padding.right);
@@ -33,21 +30,13 @@
   }
 
   const regClosedX = $derived(getX(registrationClosedAt));
-  $inspect(startedAt)
 </script>
 
 <div class="h-80 w-full p-4 border rounded-lg">
   <div class="text-sm text-muted-foreground mb-4">
-    <span>Created: {draftCreatedAt.toLocaleDateString() ?? 'N/A'}</span>
+    <span>Created: {draftCreatedAt.toLocaleDateString()}</span>
     <span class="mx-2">|</span>
-    <span>Closed: {registrationClosedAt.toLocaleDateString() ?? 'N/A'}</span>
-    {#if startedAt}
-      <span class="mx-2">|</span>
-      <span>Started: {startedAt.toLocaleDateString()}</span>
-    {:else}
-      <span class="mx-2">|</span>
-      <span>Current: {requestedAt?.toLocaleDateString() ?? 'N/A'}</span>
-    {/if}
+    <span>Closed: {registrationClosedAt.toLocaleDateString()}</span>
   </div>
 
   <svg viewBox="0 0 {width} {height}" class="w-full h-full" preserveAspectRatio="none">
@@ -70,7 +59,7 @@
     <!-- Area fill -->
     {#if timelineData.length > 0}
       <path
-        d={`M ${padding.left} ${height - padding.bottom} ${timelineData.map(d => `${getX(d.date)} ${getY(d.count)}`).join(' L ')} ${getX(endBound)} ${height - padding.bottom} Z`}
+        d={`M ${padding.left} ${height - padding.bottom} ${timelineData.map(d => `${getX(d.date)} ${getY(d.count)}`).join(' L ')} ${regClosedX} ${height - padding.bottom} Z`}
         fill="#3b82f6"
         fill-opacity="0.1"
       />

@@ -2300,7 +2300,7 @@ export async function fetchDraftRegistrationTimeline(db: DbConnection, draftId: 
     const result = await db
       .select({
         date: sql`date_trunc('day', ${schema.studentRank.createdAt})`.mapWith(coerceDate),
-        count: sql`count(*)::int`,
+        cumulativeCount: sql`sum(count(*)) over (order by date_trunc('day', ${schema.studentRank.createdAt}))`.mapWith(coerceNumber),
       })
       .from(schema.studentRank)
       .where(eq(schema.studentRank.draftId, draftId))
@@ -2309,7 +2309,7 @@ export async function fetchDraftRegistrationTimeline(db: DbConnection, draftId: 
 
     return result.map(r => ({
       date: r.date as Date,
-      count: r.count,
+      count: r.cumulativeCount,
     }));
   });
 }
