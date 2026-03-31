@@ -31,7 +31,7 @@
   }}
 >
   <div class="flex justify-around sm:justify-normal">
-    <Tabs.List class="w-full grid grid-cols-3 h-full">
+    <Tabs.List class="grid h-full w-full grid-cols-3">
       <Tabs.Trigger value="students">
         <GraduationCapIcon class="size-5" />
         <span class="sr-only md:not-sr-only">Registered Students</span>
