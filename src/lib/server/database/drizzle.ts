@@ -1157,10 +1157,12 @@ export async function validateStudentsChoseLabInRound(
   studentUserIds: string[],
 ) {
   return await tracer.asyncSpan('validate-students-chose-lab-in-round', async span => {
-    span.setAttribute('database.draft.id', draftId.toString());
-    span.setAttribute('database.lab.id', labId);
-    span.setAttribute('database.round', round);
-    span.setAttribute('database.student.count', studentUserIds.length);
+    span.setAttributes({
+      'database.draft.id': draftId.toString(),
+      'database.lab.id': labId,
+      'database.round': round,
+      'database.student.count': studentUserIds.length,
+    });
 
     if (studentUserIds.length === 0) return new Set<string>();
 
