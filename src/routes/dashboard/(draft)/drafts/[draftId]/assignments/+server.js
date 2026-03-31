@@ -31,15 +31,14 @@ export async function GET({ params, locals: { session } }) {
     user: { id: userId },
   } = session;
 
-  const draftId = BigInt(params.draftId);
-
   return await tracer.asyncSpan('fetch-draft-assignments', async span => {
     span.setAttributes({
-      'draft.id': draftId.toString(),
       'session.id': sessionId,
       'session.user.id': userId,
+      'draft.id': params.draftId,
     });
 
+    const draftId = BigInt(params.draftId);
     const assignments = await getDraftAssignmentRecords(db, draftId);
 
     logger.debug('draft assignments fetched', {
