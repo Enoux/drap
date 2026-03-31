@@ -3,6 +3,7 @@
 </script>
 
 <script lang="ts">
+  import * as v from 'valibot';
   import ArrowDownIcon from '@lucide/svelte/icons/arrow-down';
   import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
   import BoxSelectIcon from '@lucide/svelte/icons/box-select';
@@ -10,18 +11,20 @@
   import XIcon from '@lucide/svelte/icons/x';
   import { crossfade } from 'svelte/transition';
   import { flip } from 'svelte/animate';
-  import { PersistedState, useDebounce } from 'runed';
+  import { mergeProps } from 'bits-ui';
+  import { PersistedState } from 'runed';
   import { toast } from 'svelte-sonner';
 
   import * as Card from '$lib/components/ui/card';
   import * as Empty from '$lib/components/ui/empty';
-  import { mergeProps } from 'bits-ui';
   import { assert } from '$lib/assert';
   import { Button } from '$lib/components/ui/button';
   import { enhance } from '$app/forms';
   import type { schema } from '$lib/server/database/drizzle';
   import { TextArea } from '$lib/components/ui/textarea';
   import { Tooltip, TooltipContent, TooltipTrigger } from '$lib/components/ui/tooltip';
+
+  import { DebouncedMirror } from './debounced-mirror.svelte';
 
   interface Props {
     userId: string;
@@ -47,17 +50,22 @@
   const remaining = $derived(maxRounds - persistedSelectedLabs.current.length);
   const hasRemaining = $derived(remaining > 0);
 
-  const persistedLabRemarks = $derived(
-    new PersistedState<Record<string, string>>(
-      `lab-remarks-${userId}-${draftId}`,
-      {},
-      { syncTabs: true },
-    ),
+  const LabRemarksSchema = v.record(v.string(), v.string());
+  const labRemarks = $derived(
+    new DebouncedMirror({
+      key: `lab-remarks-${userId}-${draftId}`,
+      schema: LabRemarksSchema,
+      debounceMs: 500,
+    }),
   );
 
-  const debouncedSetLabRemarks = useDebounce((labId: string, value: string) => {
-    persistedLabRemarks.current[labId] = value;
-  }, 500);
+  function updateLabRemarks(labId: string, value: string) {
+    const next = { ...labRemarks.current };
+    if (value === '') delete next[labId];
+    else next[labId] = value;
+
+    labRemarks.current = next;
+  }
 
   function selectLab(index: number) {
     if (persistedSelectedLabs.current.length >= maxRounds) return;
@@ -115,6 +123,8 @@
       return;
     }
 
+    labRemarks.flush();
+
     assert(submitter !== null);
     assert(submitter instanceof HTMLButtonElement);
     submitter.disabled = true;
@@ -127,7 +137,7 @@
           toast.success('Uploaded your lab preferences.');
           persistedAvailableLabs.disconnect();
           persistedSelectedLabs.disconnect();
-          persistedLabRemarks.disconnect();
+          labRemarks.clear();
           break;
         case 'failure':
           switch (result.status) {
@@ -277,8 +287,7 @@
                 placeholder="Hello {id.toUpperCase()}, my name is... I would like to do more research on..."
                 maxlength={1028}
                 bind:value={
-                  () => persistedLabRemarks.current[id] ?? '',
-                  value => debouncedSetLabRemarks(id, value)
+                  () => labRemarks?.current?.[id] ?? '', value => updateLabRemarks(id, value)
                 }
               />
             </li>
