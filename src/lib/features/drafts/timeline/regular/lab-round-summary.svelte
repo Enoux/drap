@@ -3,6 +3,7 @@
   import DraftedDraftees from '$lib/features/drafts/draftees/drafted/index.svelte';
   import InterestedDraftees from '$lib/features/drafts/draftees/interested/index.svelte';
   import { Badge } from '$lib/components/ui/badge';
+  import { cn } from '$lib/components/ui/utils';
   import type { Lab } from '$lib/features/drafts/types';
 
   interface Props {
@@ -26,11 +27,9 @@
         {lab.quota} maximum
       </Badge>
     {/if}
-    {#if lab.quota === 0}
-      <h5 class="text-lg leading-5 font-medium text-muted-foreground">{lab.name}</h5>
-    {:else}
-      <h5 class="text-lg leading-5 font-medium">{lab.name}</h5>
-    {/if}
+    <h5 class={cn('text-lg leading-5 font-medium', lab.quota === 0 && 'text-muted-foreground')}>
+      {lab.name}
+    </h5>
   </div>
   <div class="flex gap-1 lg:self-start">
     <!-- Members -->
