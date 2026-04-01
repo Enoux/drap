@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
+
   import { dev } from '$app/environment';
   import { DevTools } from '$lib/features/dev-tools';
   import { SidebarProvider } from '$lib/components/ui/sidebar';
@@ -8,17 +10,28 @@
 
   const { data, children } = $props();
   const { user } = $derived(data);
+
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: Infinity,
+        refetchOnMount: false,
+      },
+    },
+  });
 </script>
 
-<Toaster richColors closeButton />
-<SidebarProvider>
-  <div class="flex h-dvh w-full overflow-hidden">
-    <SideBar {user} />
-    <main class="grow space-y-4 overflow-y-auto px-4 pt-16 pb-20 md:pt-4 md:pb-0">
-      {@render children?.()}
-    </main>
-  </div>
-</SidebarProvider>
-{#if dev && typeof user !== 'undefined'}
-  <DevTools {user} />
-{/if}
+<QueryClientProvider client={queryClient}>
+  <Toaster richColors closeButton />
+  <SidebarProvider>
+    <div class="flex h-dvh w-full overflow-hidden">
+      <SideBar {user} />
+      <main class="grow space-y-4 overflow-y-auto px-4 pt-16 pb-20 md:pt-4 md:pb-0">
+        {@render children?.()}
+      </main>
+    </div>
+  </SidebarProvider>
+  {#if dev && typeof user !== 'undefined'}
+    <DevTools {user} />
+  {/if}
+</QueryClientProvider>

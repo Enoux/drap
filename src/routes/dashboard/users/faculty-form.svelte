@@ -1,7 +1,8 @@
 <script lang="ts">
   import SendIcon from '@lucide/svelte/icons/send';
-  import type { QueryClient } from '@tanstack/svelte-query';
   import { toast } from 'svelte-sonner';
+  // eslint-disable-next-line no-restricted-imports
+  import { useQueryClient } from '@tanstack/svelte-query';
 
   import * as NativeSelect from '$lib/components/ui/native-select';
   import { assert } from '$lib/assert';
@@ -14,10 +15,10 @@
   type Lab = Pick<schema.Lab, 'id' | 'name'>;
   interface Props {
     labs: Lab[];
-    queryClient: QueryClient;
   }
 
-  const { labs, queryClient }: Props = $props();
+  const { labs }: Props = $props();
+  const queryClient = useQueryClient();
 </script>
 
 <form

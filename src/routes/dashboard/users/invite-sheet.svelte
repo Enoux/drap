@@ -1,6 +1,5 @@
 <script lang="ts">
   import UsersIcon from '@lucide/svelte/icons/users';
-  import type { QueryClient } from '@tanstack/svelte-query';
   import type { Snippet } from 'svelte';
 
   import * as Sheet from '$lib/components/ui/sheet';
@@ -11,14 +10,13 @@
   interface Props {
     type: 'admins' | 'heads';
     inviteForm: Snippet;
-    queryClient: QueryClient;
   }
 
-  const { type, inviteForm, queryClient }: Props = $props();
+  const { type, inviteForm }: Props = $props();
 
   let sheetOpen = $state(false);
 
-  const query = createFetchInvitedUsersQuery(() => (sheetOpen ? type : null));
+  const query = $derived(createFetchInvitedUsersQuery(sheetOpen ? type : null));
 </script>
 
 <Sheet.Root bind:open={sheetOpen}>
@@ -54,7 +52,7 @@
             <p class="text-sm text-muted-foreground">No pending invitations.</p>
           {:else}
             {#each query.data as user (user.id)}
-              <Invited {user} {queryClient} />
+              <Invited {user} />
             {/each}
           {/if}
         {/if}

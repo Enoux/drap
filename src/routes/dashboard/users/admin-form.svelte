@@ -1,7 +1,8 @@
 <script lang="ts">
   import SendIcon from '@lucide/svelte/icons/send';
-  import type { QueryClient } from '@tanstack/svelte-query';
   import { toast } from 'svelte-sonner';
+  // eslint-disable-next-line no-restricted-imports
+  import { useQueryClient } from '@tanstack/svelte-query';
 
   import { assert } from '$lib/assert';
   import { Button } from '$lib/components/ui/button';
@@ -9,11 +10,7 @@
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
 
-  interface Props {
-    queryClient: QueryClient;
-  }
-
-  const { queryClient }: Props = $props();
+  const queryClient = useQueryClient();
 </script>
 
 <form
