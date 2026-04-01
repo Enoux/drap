@@ -6,7 +6,7 @@
 
   import Display, { type Props as DisplayProps } from './display.svelte';
 
-  const { draftId }: Pick<DisplayProps, 'draftId'> = $props();
+  const { draftId, requestedAt }: Pick<DisplayProps, 'draftId' | 'requestedAt'> = $props();
   const query = $derived(createFetchDraftFacultyChoicesQuery(draftId));
 </script>
 
@@ -17,5 +17,5 @@
 {:else if query.isError}
   <Empty>Uh oh! An error has occurred.</Empty>
 {:else}
-  <Display {draftId} data={query.data} />
+  <Display {draftId} {requestedAt} data={query.data} />
 {/if}

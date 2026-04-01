@@ -140,6 +140,7 @@ export async function load({ params, locals: { session } }) {
     return {
       draftId,
       draft: { id: draftId, ...draft },
+      requestedAt: new Date(),
       labs,
       studentCount,
       finalized: {

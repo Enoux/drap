@@ -15,11 +15,12 @@
 
   interface Props {
     draftId: string;
+    requestedAt: Date;
     round: number;
     labs: Lab[];
   }
 
-  const { draftId, round, labs }: Props = $props();
+  const { draftId, requestedAt, round, labs }: Props = $props();
 
   let group: TabType = $state('students');
 </script>
@@ -61,7 +62,7 @@
   </Tabs.Content>
   <Tabs.Content value="logs">
     {#if group === 'logs'}
-      <SystemLogsLoader {draftId} />
+      <SystemLogsLoader {draftId} {requestedAt} />
     {/if}
   </Tabs.Content>
 </Tabs.Root>

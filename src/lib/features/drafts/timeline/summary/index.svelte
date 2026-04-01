@@ -4,7 +4,7 @@
   import Loader2Icon from '@lucide/svelte/icons/loader-2';
   import SparklesIcon from '@lucide/svelte/icons/sparkles';
   import UsersIcon from '@lucide/svelte/icons/users';
-  import { format } from 'date-fns';
+  import { format, lightFormat } from 'date-fns';
 
   import * as Alert from '$lib/components/ui/alert';
   import * as Card from '$lib/components/ui/card';
@@ -19,6 +19,7 @@
 
   interface Props {
     draftId: string;
+    requestedAt: Date;
     draft: Pick<Draft, 'activePeriodStart' | 'activePeriodEnd' | 'maxRounds'>;
     totalStudents: number;
     labs: Lab[];
@@ -26,7 +27,7 @@
     isReview: boolean;
   }
 
-  const { draftId, draft, totalStudents, labs, finalized, isReview }: Props = $props();
+  const { draftId, requestedAt, draft, totalStudents, labs, finalized, isReview }: Props = $props();
   const participatingLabs = $derived(
     finalized.snapshots.length > 0 ? finalized.snapshots.length : labs.length,
   );
@@ -250,7 +251,7 @@
   <div class="flex flex-row gap-2 @max-[52rem]:grid @max-[52rem]:grid-cols-1">
     <Button
       href={resolve(`/dashboard/drafts/${draftId}/students.csv`)}
-      download
+      download="{lightFormat(requestedAt, 'yyyy-MM-dd')}_{draftId}_students.csv"
       variant="outline"
       class="@max-[52rem]:h-auto @max-[52rem]:min-h-9 @max-[52rem]:justify-start @max-[52rem]:py-1.5 @max-[52rem]:whitespace-normal"
     >
@@ -259,7 +260,7 @@
     </Button>
     <Button
       href={resolve(`/dashboard/drafts/${draftId}/results.csv`)}
-      download
+      download="{lightFormat(requestedAt, 'yyyy-MM-dd')}_{draftId}_results.csv"
       variant="outline"
       class="@max-[52rem]:h-auto @max-[52rem]:min-h-9 @max-[52rem]:justify-start @max-[52rem]:py-1.5 @max-[52rem]:whitespace-normal"
     >
@@ -268,7 +269,7 @@
     </Button>
     <Button
       href={resolve(`/dashboard/drafts/${draftId}/system-logs.csv`)}
-      download
+      download="{lightFormat(requestedAt, 'yyyy-MM-dd')}_{draftId}_system-logs.csv"
       variant="outline"
       class="@max-[52rem]:h-auto @max-[52rem]:min-h-9 @max-[52rem]:justify-start @max-[52rem]:py-1.5 @max-[52rem]:whitespace-normal"
     >

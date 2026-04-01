@@ -1,6 +1,6 @@
 <script lang="ts">
   import ArrowUpFromLineIcon from '@lucide/svelte/icons/arrow-up-from-line';
-  import { format } from 'date-fns';
+  import { format, lightFormat } from 'date-fns';
 
   import { Button } from '$lib/components/ui/button';
   import type { Draft, DraftFinalizedBreakdown, Lab } from '$lib/features/drafts/types';
@@ -26,6 +26,7 @@
 
   interface Props {
     draftId: bigint;
+    requestedAt: Date;
     draft: Draft;
     labs: Lab[];
     studentCount: number;
@@ -35,6 +36,7 @@
 
   const {
     draftId: rawDraftId,
+    requestedAt,
     draft,
     labs,
     studentCount,
@@ -131,7 +133,7 @@
       <div class="flex flex-wrap gap-2 *:w-full min-[24rem]:*:w-min">
         <Button
           href={resolve(`/dashboard/drafts/${draftId}/students.csv`)}
-          download
+          download="{lightFormat(requestedAt, 'yyyy-MM-dd')}_{draftId}_students.csv"
           variant="outline"
           size="sm"
         >
@@ -140,7 +142,7 @@
         </Button>
         <Button
           href={resolve(`/dashboard/drafts/${draftId}/results.csv`)}
-          download
+          download="{lightFormat(requestedAt, 'yyyy-MM-dd')}_{draftId}_results.csv"
           variant="outline"
           size="sm"
         >
@@ -149,7 +151,7 @@
         </Button>
         <Button
           href={resolve(`/dashboard/drafts/${draftId}/system-logs.csv`)}
-          download
+          download="{lightFormat(requestedAt, 'yyyy-MM-dd')}_{draftId}_system-logs.csv"
           variant="outline"
           size="sm"
         >
@@ -175,6 +177,7 @@
         {/snippet}
         <SummaryPhase
           {draftId}
+          {requestedAt}
           {draft}
           totalStudents={studentCount}
           {labs}
@@ -214,9 +217,9 @@
           </span>
         {/snippet}
         {#if draft.currRound !== null && draft.currRound > 0 && draft.currRound <= draft.maxRounds}
-          <RegularPhase {draftId} round={draft.currRound} {labs} />
+          <RegularPhase {draftId} {requestedAt} round={draft.currRound} {labs} />
         {:else if currentPhase === 'review' || currentPhase === 'finalized'}
-          <RegularPhase {draftId} round={draft.maxRounds} {labs} />
+          <RegularPhase {draftId} {requestedAt} round={draft.maxRounds} {labs} />
         {:else}
           <p class="text-muted-foreground">
             Regular rounds have been completed. {draft.maxRounds} rounds were executed.
