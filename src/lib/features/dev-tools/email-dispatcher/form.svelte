@@ -111,6 +111,13 @@
       </div>
     {:else if selectedEvent === 'draft/round.submitted.email.batch'}
       <div class="space-y-2">
+        <Label for="selectionMode">Selection Mode</Label>
+        <NativeSelect.Root name="selectionMode" id="selectionMode" class="w-full">
+          <NativeSelect.Option value="create">Create Selection</NativeSelect.Option>
+          <NativeSelect.Option value="update">Update Selection</NativeSelect.Option>
+        </NativeSelect.Root>
+      </div>
+      <div class="space-y-2">
         <Label for="draftId">Draft ID</Label>
         <Input type="number" name="draftId" id="draftId" required placeholder="1" />
       </div>
