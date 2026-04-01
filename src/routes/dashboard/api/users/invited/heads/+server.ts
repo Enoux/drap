@@ -5,13 +5,11 @@ import { getInvitedHeads } from '$lib/server/database/drizzle';
 import { Logger } from '$lib/server/telemetry/logger';
 import { Tracer } from '$lib/server/telemetry/tracer';
 
-import type { RequestEvent } from './$types';
-
 const SERVICE_NAME = 'routes.dashboard.api.users.invited.heads';
 const logger = Logger.byName(SERVICE_NAME);
 const tracer = Tracer.byName(SERVICE_NAME);
 
-export async function GET({ locals: { session } }: RequestEvent) {
+export async function GET({ locals: { session } }) {
   if (typeof session?.user === 'undefined') {
     logger.fatal('attempt to access invited heads without session');
     error(401);
@@ -36,7 +34,6 @@ export async function GET({ locals: { session } }: RequestEvent) {
       'session.id': sessionId,
       'session.user.id': userId,
     });
-
     const heads = await getInvitedHeads(db);
     return json(heads);
   });
