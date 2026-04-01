@@ -151,7 +151,7 @@ export const actions = {
       error(403);
     }
 
-    return await tracer.asyncSpan('action.deleteInvite', async () => {
+    return await tracer.asyncSpan('action.delete-invite', async () => {
       const data = await request.formData();
       const { id } = v.parse(DeleteInviteFormData, decode(data));
       logger.debug('deleting invite', { id });
