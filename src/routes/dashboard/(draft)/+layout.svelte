@@ -13,23 +13,29 @@
   {#if typeof designatedSender === 'undefined'}
     {#if candidateSenders.length === 0}
       <Callout variant="destructive"
-        >No candidate email senders have been added yet. Please <Link href={emailSettingsHref}
-          >nominate a candidate sender</Link
-        > before starting a new draft.
+        ><span
+          >No candidate email senders have been added yet. Please <Link href={emailSettingsHref}
+            >nominate a candidate sender</Link
+          > before starting a new draft.</span
+        >
       </Callout>
     {:else}
       <Callout variant="warning"
-        >No designated email senders have been assigned yet. Please <Link href={emailSettingsHref}
-          >promote a designated sender</Link
-        > before starting a new draft.
+        ><span
+          >No designated email senders have been assigned yet. Please <Link href={emailSettingsHref}
+            >promote a designated sender</Link
+          > before starting a new draft.</span
+        >
       </Callout>
     {/if}
   {:else}
     <Callout variant="info">
-      <Link href="mailto:{designatedSender.email}"
-        >{designatedSender.givenName} {designatedSender.familyName}</Link
-      > is the currently designated email sender. <Link href={emailSettingsHref}
-        >You may update the configuration here.</Link
+      <span
+        ><Link href="mailto:{designatedSender.email}"
+          >{designatedSender.givenName} {designatedSender.familyName}</Link
+        > is the currently designated email sender. <Link href={emailSettingsHref}
+          >You may update the configuration here.</Link
+        ></span
       >
     </Callout>
   {/if}

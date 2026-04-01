@@ -6,7 +6,7 @@
 </script>
 
 {#if error !== null}
-  <Callout variant="destructive"><strong>{status}:</strong> {error.message}</Callout>
+  <Callout variant="destructive"><span><strong>{status}:</strong> {error.message}</span></Callout>
 {:else}
-  <Callout variant="destructive"><strong>{status}</strong></Callout>
+  <Callout variant="destructive"><span><strong>{status}</strong></span></Callout>
 {/if}

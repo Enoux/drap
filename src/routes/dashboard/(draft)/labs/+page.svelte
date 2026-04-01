@@ -15,14 +15,18 @@
   {@const startTime = format(activePeriodStart, 'pp')}
   {#if isRegistrationActive}
     <Callout variant="destructive" class="mb-4">
-      <strong>Draft #{draftId}</strong> registration is ongoing. The lab catalog is locked to prevent
-      inconsistencies while students are submitting their rankings.
+      <span
+        ><strong>Draft #{draftId}</strong> registration is ongoing. The lab catalog is locked to prevent
+        inconsistencies while students are submitting their rankings.</span
+      >
     </Callout>
   {:else}
     <Callout variant="warning" class="mb-4">
-      <strong>Draft #{draftId}</strong> started last <strong>{startDate}</strong> at
-      <strong>{startTime}</strong>. Changes on this page only affect the lab catalog and will not be
-      reflected in the currently active draft.
+      <span
+        ><strong>Draft #{draftId}</strong> started last <strong>{startDate}</strong> at
+        <strong>{startTime}</strong>. Changes on this page only affect the lab catalog and will not
+        be reflected in the currently active draft.</span
+      >
     </Callout>
   {/if}
 {/if}

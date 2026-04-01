@@ -34,7 +34,5 @@
       {title}
     </Alert.Title>
   {/if}
-  <Alert.Description>
-    {@render children()}
-  </Alert.Description>
+  <Alert.Description {children} />
 </Alert.Root>

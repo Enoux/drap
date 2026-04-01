@@ -52,16 +52,20 @@
     </p>
     <div class="not-prose space-y-4">
       <Callout variant="warning">
-        Note that consent is user-specific. Nevertheless, <em>any</em> draft administrator may
-        promote, demote, and remove <em>any</em> of the candidate senders.
+        <span
+          >Note that consent is user-specific. Nevertheless, <em>any</em> draft administrator may
+          promote, demote, and remove <em>any</em> of the candidate senders.</span
+        >
       </Callout>
       <Callout variant="warning">
-        Google sets <Link
-          target="_blank"
-          rel="external"
-          href="https://support.google.com/a/answer/166852#limits">limits</Link
-        > on the number of automated emails that can be sent within a rolling 24-hour period. As such,
-        some email notifications may not timely arrive.
+        <span
+          >Google sets <Link
+            target="_blank"
+            rel="external"
+            href="https://support.google.com/a/answer/166852#limits">limits</Link
+          > on the number of automated emails that can be sent within a rolling 24-hour period. As such,
+          some email notifications may not timely arrive.</span
+        >
       </Callout>
     </div>
   </div>
