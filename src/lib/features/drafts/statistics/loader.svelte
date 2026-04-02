@@ -25,13 +25,12 @@
 {:else if query.isError}
   <Empty>Uh oh! An error has occurred.</Empty>
 {:else}
-  {@const regularDrafted = query.data.filter(({ round }) => round !== null && round > 0 && round <= maxRounds)}
-  {@const interventionDrafted = query.data.filter(({ round }) => round !== null && round === maxRounds + 1)}
+  {@const regularDrafted = query.data.filter(
+    ({ round }) => round !== null && round > 0 && round <= maxRounds,
+  )}
+  {@const interventionDrafted = query.data.filter(
+    ({ round }) => round !== null && round === maxRounds + 1,
+  )}
   {@const lotteryDrafted = query.data.filter(({ round }) => round === null)}
-  <Display
-    {regularDrafted}
-    {interventionDrafted}
-    {lotteryDrafted}
-    {...displayProps}
-  />
+  <Display {regularDrafted} {interventionDrafted} {lotteryDrafted} {...displayProps} />
 {/if}
