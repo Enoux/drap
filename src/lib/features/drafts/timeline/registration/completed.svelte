@@ -1,6 +1,7 @@
 <script lang="ts">
-  import DrafteesSheet from './draftees-sheet.svelte';
   import RegistrantsChart from './registrants-chart.svelte';
+
+  import DrafteesSheet from './draftees-sheet/index.svelte';
 
   interface Props {
     draftId: string;

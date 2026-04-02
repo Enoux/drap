@@ -19,7 +19,7 @@
   <DropdownMenu.Trigger>
     <button
       type="button"
-      class="inline-flex items-center gap-1 rounded-sm p-0 text-inherit transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-100"
+      class="inline-flex items-center gap-1 rounded-sm p-0 text-inherit transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-100"
       disabled={options.length === 0}
     >
       <span>{header}</span>
@@ -34,7 +34,7 @@
     </button>
   </DropdownMenu.Trigger>
   <DropdownMenu.Content align="start" class="min-w-44">
-    <DropdownMenu.RadioGroup value={value} {onValueChange}>
+    <DropdownMenu.RadioGroup {value} {onValueChange}>
       <DropdownMenu.RadioItem value="">
         <span>All</span>
       </DropdownMenu.RadioItem>
@@ -42,7 +42,7 @@
       {#each options as option (option.value)}
         <DropdownMenu.RadioItem value={option.value}>
           <span class="uppercase">{option.value}</span>
-          <span class="ml-auto text-xs tabular-nums text-muted-foreground">{option.count}</span>
+          <span class="ml-auto text-xs text-muted-foreground tabular-nums">{option.count}</span>
         </DropdownMenu.RadioItem>
       {/each}
     </DropdownMenu.RadioGroup>

@@ -2,32 +2,28 @@
   import * as Sheet from '$lib/components/ui/sheet';
   import { Button } from '$lib/components/ui/button';
 
-  import Loader, { type Props } from './loader.svelte';
+  import DrafteesSheetContent from './content.svelte';
 
-  const props: Props = $props();
+  interface Props {
+    draftId: string;
+  }
+
+  const { draftId }: Props = $props();
 </script>
 
 <Sheet.Root>
   <Sheet.Trigger>
     {#snippet child({ props })}
-      <Button
-        variant="outline"
-        class="h-fit border-secondary bg-secondary/10 font-mono text-xs uppercase"
-        {...props}
-      >
-        Interested
-      </Button>
+      <Button variant="outline" class="gap-2" {...props}>View All Draftees</Button>
     {/snippet}
   </Sheet.Trigger>
   <Sheet.Content side="right" class="flex w-full flex-col overflow-hidden sm:max-w-[600px]">
     <Sheet.Header>
-      <Sheet.Title>Interested Students</Sheet.Title>
-      <Sheet.Description>
-        Review students who ranked this lab for the current round.
-      </Sheet.Description>
+      <Sheet.Title>All Draftees</Sheet.Title>
+      <Sheet.Description>Browse registered and late draftees for this draft.</Sheet.Description>
     </Sheet.Header>
     <div class="flex min-h-0 grow flex-col overflow-y-auto px-4 pb-4">
-      <Loader {...props} />
+      <DrafteesSheetContent {draftId} />
     </div>
   </Sheet.Content>
 </Sheet.Root>

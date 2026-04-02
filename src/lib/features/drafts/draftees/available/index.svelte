@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tv } from 'tailwind-variants';
 
-  import * as Drawer from '$lib/components/ui/drawer';
+  import * as Sheet from '$lib/components/ui/sheet';
   import { Button } from '$lib/components/ui/button';
 
   import Loader, { type Props as LoaderProps } from './loader.svelte';
@@ -21,8 +21,7 @@
 
   const { variant, ...props }: Props = $props();
 
-  type TriggerVariant = typeof variant;
-  function getTriggerLabel(variant: TriggerVariant) {
+  const triggerLabel = $derived.by(() => {
     switch (variant) {
       case 'pending-selection':
         return 'Pending Selection';
@@ -31,20 +30,35 @@
       default:
         throw new Error('unreachable');
     }
-  }
+  });
+
+  const title = $derived.by(() => {
+    switch (variant) {
+      case 'pending-selection':
+        return 'Pending Selection';
+      case 'see-preferred':
+        return 'Available Draftees';
+      default:
+        throw new Error('unreachable');
+    }
+  });
 </script>
 
-<Drawer.Root>
-  <Drawer.Trigger>
+<Sheet.Root>
+  <Sheet.Trigger>
     {#snippet child({ props })}
       <Button variant="outline" class={triggerVariants({ variant })} {...props}>
-        {getTriggerLabel(variant)}
+        {triggerLabel}
       </Button>
     {/snippet}
-  </Drawer.Trigger>
-  <Drawer.Content class="min-h-screen">
-    <div class="overflow-auto px-8 pb-40">
+  </Sheet.Trigger>
+  <Sheet.Content side="right" class="flex w-full flex-col overflow-hidden sm:max-w-[600px]">
+    <Sheet.Header>
+      <Sheet.Title>{title}</Sheet.Title>
+      <Sheet.Description>Review undrafted students available for selection.</Sheet.Description>
+    </Sheet.Header>
+    <div class="flex min-h-0 grow flex-col overflow-y-auto px-4 pb-4">
       <Loader {...props} />
     </div>
-  </Drawer.Content>
-</Drawer.Root>
+  </Sheet.Content>
+</Sheet.Root>
