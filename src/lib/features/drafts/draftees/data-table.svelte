@@ -1,12 +1,9 @@
 <script lang="ts">
-  import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
   import {
-    type ColumnFiltersState,
     createColumnHelper,
     getCoreRowModel,
     getFilteredRowModel,
     getSortedRowModel,
-    type SortingState,
   } from '@tanstack/table-core';
   import type { Snippet } from 'svelte';
 
@@ -19,6 +16,7 @@
   import { createSvelteTable, FlexRender, renderComponent } from '$lib/components/ui/data-table';
   import type { Student } from '$lib/features/drafts/types';
 
+  import LateNameCell from './late-name-cell.svelte';
   import SortByHeader from './sort-by-header.svelte';
 
   interface ExtendedStudent extends Student {
@@ -35,16 +33,6 @@
   // Shape the table columns
   const columnHelper = createColumnHelper<ExtendedStudent>();
   const columns = [
-    columnHelper.accessor('id', {
-      id: 'isLate',
-      header: '',
-      cell({ row }) {
-        const { isLate } = row.original;
-        return isLate
-          ? renderComponent(TriangleAlertIcon, { class: 'size-4 text-amber-500 ml-2' })
-          : null;
-      },
-    }),
     columnHelper.accessor(({ studentNumber }) => studentNumber, {
       id: 'studentNumber',
       header: header =>
@@ -63,7 +51,8 @@
             header: 'Name',
             onclick: header.column.getToggleSortingHandler(),
           }),
-        cell: info => info.getValue(),
+        cell: ({ getValue, row }) =>
+          renderComponent(LateNameCell, { isLate: row.original.isLate ?? false, name: getValue() }),
       },
     ),
     columnHelper.accessor(({ email }) => email, {
@@ -89,18 +78,16 @@
     }),
   ];
 
-  // Store table states
-  let sorting: SortingState = $state([]);
-  let columnFilters: ColumnFiltersState = $state([]);
-
   // Get all possible labs for filtering
   const designatedLabFilters = $derived(
-    [...new Set(data.map(({ labId }) => labId))].filter(labId => labId !== null).sort(),
+    Array.from(new Set(data.map(({ labId }) => labId)))
+      .filter(labId => labId !== null)
+      .sort(),
   );
-  let designatedLabFilterValue = $state('');
 
-  const preferredLabFilters = $derived([...new Set(data.flatMap(({ labs }) => labs))].sort());
-  let preferredLabFilterValues: string[] = $state([]);
+  const preferredLabFilters = $derived(
+    Array.from(new Set(data.flatMap(({ labs }) => labs))).sort(),
+  );
 
   // This only initializes lazily on load.
   // We put it here so that we don't needlessly initialize state
@@ -109,29 +96,24 @@
     createSvelteTable({
       data,
       columns,
-
-      // Normal state
       getCoreRowModel: getCoreRowModel(),
-
-      // Sorted state
       getSortedRowModel: getSortedRowModel(),
-      onSortingChange(updater) {
-        sorting = typeof updater === 'function' ? updater(sorting) : updater;
-      },
-
-      // Filtered state
       getFilteredRowModel: getFilteredRowModel(),
-      onColumnFiltersChange(updater) {
-        columnFilters = typeof updater === 'function' ? updater(columnFilters) : updater;
-      },
-
-      // List of table states
-      state: {
-        sorting,
-        columnFilters,
-      },
     }),
   );
+
+  const headerGroups = $derived.by(() => table.getHeaderGroups());
+  const { rows } = $derived.by(() => table.getRowModel());
+
+  const designatedLabFilterValue = $derived.by(() => {
+    const value = table.getColumn('labId')?.getFilterValue();
+    return typeof value === 'string' ? value : '';
+  });
+
+  const preferredLabFilterValues = $derived.by(() => {
+    const value = table.getColumn('labs')?.getFilterValue();
+    return Array.isArray(value) ? value.filter(lab => typeof lab === 'string') : [];
+  });
 </script>
 
 <!-- Filter Buttons -->
@@ -152,8 +134,7 @@
       <DropdownMenu.Content>
         <DropdownMenu.Item
           onclick={() => {
-            designatedLabFilterValue = '';
-            table.getColumn('labId')?.setFilterValue(designatedLabFilterValue);
+            table.getColumn('labId')?.setFilterValue(() => '');
           }}
         >
           Clear Filter
@@ -161,8 +142,9 @@
         {#each designatedLabFilters as filter (filter)}
           <DropdownMenu.Item
             onclick={() => {
-              designatedLabFilterValue = designatedLabFilterValue === filter ? '' : filter;
-              table.getColumn('labId')?.setFilterValue(designatedLabFilterValue);
+              table
+                .getColumn('labId')
+                ?.setFilterValue((current: unknown) => (current === filter ? '' : filter));
             }}
           >
             {#if designatedLabFilterValue === filter}
@@ -197,8 +179,7 @@
       <DropdownMenu.Content>
         <DropdownMenu.Item
           onclick={() => {
-            preferredLabFilterValues = [];
-            table.getColumn('labs')?.setFilterValue(preferredLabFilterValues);
+            table.getColumn('labs')?.setFilterValue(() => []);
           }}
         >
           Clear Filters
@@ -206,10 +187,15 @@
         {#each preferredLabFilters as filter (filter)}
           <DropdownMenu.Item
             onclick={() => {
-              preferredLabFilterValues = preferredLabFilterValues.includes(filter)
-                ? preferredLabFilterValues.filter(lab => lab !== filter)
-                : [...preferredLabFilterValues, filter];
-              table.getColumn('labs')?.setFilterValue(preferredLabFilterValues);
+              table.getColumn('labs')?.setFilterValue((current: string[] | undefined) => {
+                const selected = Array.isArray(current)
+                  ? current.filter(lab => typeof lab === 'string')
+                  : [];
+
+                return selected.includes(filter)
+                  ? selected.filter(lab => lab !== filter)
+                  : [...selected, filter];
+              });
             }}
           >
             {#if preferredLabFilterValues.includes(filter)}
@@ -232,7 +218,7 @@
 <div class="mx-4 rounded-sm">
   <Table.Root>
     <Table.Header>
-      {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
+      {#each headerGroups as headerGroup (headerGroup.id)}
         <Table.Row>
           {#each headerGroup.headers as header (header.id)}
             <Table.Head colspan={header.colSpan}>
@@ -248,7 +234,7 @@
       {/each}
     </Table.Header>
     <Table.Body>
-      {#each table.getRowModel().rows as row (row.id)}
+      {#each rows as row (row.id)}
         <Table.Row>
           {#each row.getVisibleCells() as cell (cell.id)}
             <Table.Cell>

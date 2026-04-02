@@ -1,11 +1,9 @@
 <script lang="ts">
   import {
-    type ColumnFiltersState,
     createColumnHelper,
     getCoreRowModel,
     getFilteredRowModel,
     getSortedRowModel,
-    type SortingState,
   } from '@tanstack/table-core';
 
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -76,13 +74,8 @@
     }),
   ];
 
-  // Store table states
-  let sorting: SortingState = $state([]);
-  let columnFilters: ColumnFiltersState = $state([]);
-
   // Get all possible labs for filtering
   const preferredLabFilters = $derived([...new Set(data.flatMap(({ labs }) => labs))].sort());
-  let preferredLabFilterValues: string[] = $state([]);
 
   // This only initializes lazily on load.
   // We put it here so that we don't needlessly initialize state
@@ -97,23 +90,19 @@
 
       // Sorted state
       getSortedRowModel: getSortedRowModel(),
-      onSortingChange(updater) {
-        sorting = typeof updater === 'function' ? updater(sorting) : updater;
-      },
 
       // Filtered state
       getFilteredRowModel: getFilteredRowModel(),
-      onColumnFiltersChange(updater) {
-        columnFilters = typeof updater === 'function' ? updater(columnFilters) : updater;
-      },
-
-      // List of table states
-      state: {
-        sorting,
-        columnFilters,
-      },
     }),
   );
+
+  const headerGroups = $derived.by(() => table.getHeaderGroups());
+  const { rows } = $derived.by(() => table.getRowModel());
+
+  const preferredLabFilterValues = $derived.by(() => {
+    const value = table.getColumn('labs')?.getFilterValue();
+    return Array.isArray(value) ? value.filter(lab => typeof lab === 'string') : [];
+  });
 </script>
 
 <!-- Filter Buttons -->
@@ -135,8 +124,7 @@
       <DropdownMenu.Content>
         <DropdownMenu.Item
           onclick={() => {
-            preferredLabFilterValues = [];
-            table.getColumn('labs')?.setFilterValue(preferredLabFilterValues);
+            table.getColumn('labs')?.setFilterValue(() => []);
           }}
         >
           Clear Filters
@@ -144,10 +132,15 @@
         {#each preferredLabFilters as filter (filter)}
           <DropdownMenu.Item
             onclick={() => {
-              preferredLabFilterValues = preferredLabFilterValues.includes(filter)
-                ? preferredLabFilterValues.filter(lab => lab !== filter)
-                : [...preferredLabFilterValues, filter];
-              table.getColumn('labs')?.setFilterValue(preferredLabFilterValues);
+              table.getColumn('labs')?.setFilterValue((current: string[] | undefined) => {
+                const selected = Array.isArray(current)
+                  ? current.filter(lab => typeof lab === 'string')
+                  : [];
+
+                return selected.includes(filter)
+                  ? selected.filter(lab => lab !== filter)
+                  : [...selected, filter];
+              });
             }}
           >
             {#if preferredLabFilterValues.includes(filter)}
@@ -171,7 +164,7 @@
   <Table.Root>
     <!-- Header Row -->
     <Table.Header>
-      {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
+      {#each headerGroups as headerGroup (headerGroup.id)}
         <Table.Row>
           {#each headerGroup.headers as header (header.id)}
             <Table.Head colspan={header.colSpan}>
@@ -189,7 +182,7 @@
 
     <!-- Table Rows -->
     <Table.Body>
-      {#each table.getRowModel().rows as row (row.id)}
+      {#each rows as row (row.id)}
         <Table.Row>
           {#each row.getVisibleCells() as cell (cell.id)}
             <Table.Cell>
