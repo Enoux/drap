@@ -15,34 +15,23 @@
   const { draftId, ...displayProps }: Props = $props();
   const { maxRounds } = $derived(displayProps);
 
-  const regularDraftedQuery = $derived(
-    createFetchDraftAssignmentsQuery(draftId, assignments =>
-      assignments.filter(({ round }) => round !== null && round > 0 && round <= maxRounds),
-    ),
-  );
-  const interventionDraftedQuery = $derived(
-    createFetchDraftAssignmentsQuery(draftId, assignments =>
-      assignments.filter(({ round }) => round !== null && round === maxRounds + 1),
-    ),
-  );
-  const lotteryDraftedQuery = $derived(
-    createFetchDraftAssignmentsQuery(draftId, assignments =>
-      assignments.filter(({ round }) => round === null),
-    ),
-  );
+  const query = $derived(createFetchDraftAssignmentsQuery(draftId));
 </script>
 
-{#if regularDraftedQuery.isError || interventionDraftedQuery.isError || lotteryDraftedQuery.isError}
-  <Empty>Uh oh! An error has occurred.</Empty>
-{:else if regularDraftedQuery.isPending || interventionDraftedQuery.isPending || lotteryDraftedQuery.isPending}
+{#if query.isPending}
   <div class="flex h-full items-center justify-center">
     <Loader2Icon class="size-20 animate-spin" />
   </div>
+{:else if query.isError}
+  <Empty>Uh oh! An error has occurred.</Empty>
 {:else}
+  {@const regularDrafted = query.data.filter(({ round }) => round !== null && round > 0 && round <= maxRounds)}
+  {@const interventionDrafted = query.data.filter(({ round }) => round !== null && round === maxRounds + 1)}
+  {@const lotteryDrafted = query.data.filter(({ round }) => round === null)}
   <Display
-    regularDrafted={regularDraftedQuery.data}
-    interventionDrafted={interventionDraftedQuery.data}
-    lotteryDrafted={lotteryDraftedQuery.data}
+    {regularDrafted}
+    {interventionDrafted}
+    {lotteryDrafted}
     {...displayProps}
   />
 {/if}
