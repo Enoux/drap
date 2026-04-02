@@ -12,7 +12,6 @@
   import Display from './display.svelte';
   import Empty from '$lib/components/ui/empty/empty.svelte';
   import { createFetchDraftAssignmentsQuery } from '$lib/queries/fetch-draft-assignments';
-  import { createFetchDrafteesQuery } from '$lib/queries/fetch-draftees';
 
   const { draftId, ...displayProps }: Props = $props();
   const { maxRounds } = $derived(displayProps);
@@ -32,13 +31,11 @@
       assignments.filter(({ round }) => round === null),
     ),
   );
-
-  const drafteesQuery = $derived(createFetchDrafteesQuery(draftId));
 </script>
   
-{#if regularDraftedQuery.isError || interventionDraftedQuery.isError || lotteryDraftedQuery.isError || drafteesQuery.isError}
+{#if regularDraftedQuery.isError || interventionDraftedQuery.isError || lotteryDraftedQuery.isError}
   <Empty>Uh oh! An error has occurred.</Empty>
-{:else if regularDraftedQuery.isPending || interventionDraftedQuery.isPending || lotteryDraftedQuery.isPending || drafteesQuery.isPending}
+{:else if regularDraftedQuery.isPending || interventionDraftedQuery.isPending || lotteryDraftedQuery.isPending}
   <div class="flex h-full items-center justify-center">
     <Loader2Icon class="size-20 animate-spin" />
   </div>
