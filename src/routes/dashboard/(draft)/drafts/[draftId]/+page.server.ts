@@ -101,23 +101,18 @@ export async function load({ params, locals: { session } }) {
       error(404);
     }
 
-    const {
-      studentCount,
-      quotaSnapshots,
-      allowlistCount,
-      lateRegistrantsCount,
-      timelineData,
-    } = await db.transaction(
-      // Needs to be done sequentially because parallel queries in a transaction are not supported.
-      async db => ({
-        studentCount: await getStudentCountInDraft(db, draftId),
-        quotaSnapshots: await getDraftLabQuotaSnapshots(db, draftId),
-        allowlistCount: await getAllowlistCountByDraft(db, draftId),
-        lateRegistrantsCount: await getLateRegistrantsCountByDraft(db, draftId),
-        timelineData: await getDraftRegistrationTimeline(db, draftId),
-      }),
-      { isolationLevel: 'repeatable read' },
-    );
+    const { studentCount, quotaSnapshots, allowlistCount, lateRegistrantsCount, timelineData } =
+      await db.transaction(
+        // Needs to be done sequentially because parallel queries in a transaction are not supported.
+        async db => ({
+          studentCount: await getStudentCountInDraft(db, draftId),
+          quotaSnapshots: await getDraftLabQuotaSnapshots(db, draftId),
+          allowlistCount: await getAllowlistCountByDraft(db, draftId),
+          lateRegistrantsCount: await getLateRegistrantsCountByDraft(db, draftId),
+          timelineData: await getDraftRegistrationTimeline(db, draftId),
+        }),
+        { isolationLevel: 'repeatable read' },
+      );
 
     const labs = quotaSnapshots.map(({ labId, labName, initialQuota }) => ({
       id: labId,
