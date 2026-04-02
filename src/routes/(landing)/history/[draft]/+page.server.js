@@ -31,7 +31,7 @@ export async function load({ params: { draft: id } }) {
     logger.debug('draft fetched', {
       'draft.round.current': draft.currRound,
       'draft.round.max': draft.maxRounds,
-      'draft.registration.closes_at': draft.registrationClosesAt.toISOString(),
+      'draft.registration.closes_at': draft.registrationClosedAt.toISOString(),
     });
 
     const events = await getDraftEvents(db, draftId);

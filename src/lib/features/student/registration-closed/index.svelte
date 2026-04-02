@@ -7,13 +7,13 @@
   import { resolve } from '$app/paths';
 
   interface Props {
-    registrationClosesAt: Date;
+    registrationClosedAt: Date;
   }
 
-  const { registrationClosesAt }: Props = $props();
+  const { registrationClosedAt }: Props = $props();
 
-  const closeDate = $derived(format(registrationClosesAt, 'PPP'));
-  const closeTime = $derived(format(registrationClosesAt, 'pp'));
+  const closeDate = $derived(format(registrationClosedAt, 'PPP'));
+  const closeTime = $derived(format(registrationClosedAt, 'pp'));
 </script>
 
 <Empty.Root>

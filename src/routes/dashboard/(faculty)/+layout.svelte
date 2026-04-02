@@ -9,15 +9,15 @@
       id,
       currRound,
       maxRounds,
-      registrationClosesAt,
+      registrationClosedAt,
       activePeriodStart,
       isRegistrationClosed,
     },
   } = $derived(data);
   const startDate = $derived(format(activePeriodStart, 'PPP'));
   const startTime = $derived(format(activePeriodStart, 'pp'));
-  const closeDate = $derived(format(registrationClosesAt, 'PPP'));
-  const closeTime = $derived(format(registrationClosesAt, 'pp'));
+  const closeDate = $derived(format(registrationClosedAt, 'PPP'));
+  const closeTime = $derived(format(registrationClosedAt, 'pp'));
 </script>
 
 <Alert.Root variant="info">

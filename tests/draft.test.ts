@@ -90,7 +90,7 @@ async function expectVisibleButtons(page: Page, labels: string[]) {
     await expect(page.getByRole('button', { name: label }).first()).toBeVisible();
 }
 
-async function expectDrawerContents(
+async function expectSheetContents(
   page: Page,
   triggerName: string,
   expectedVisible: (string | RegExp)[],
@@ -98,14 +98,14 @@ async function expectDrawerContents(
 ) {
   await page.getByRole('button', { name: triggerName }).first().click();
 
-  const drawer = page.locator('[data-slot="drawer-content"]').last();
-  await expect(drawer).toBeVisible();
+  const sheet = page.locator('[data-slot="sheet-content"]').last();
+  await expect(sheet).toBeVisible();
 
-  for (const value of expectedVisible) await expect(drawer).toContainText(value);
-  for (const value of expectedHidden) await expect(drawer).not.toContainText(value);
+  for (const value of expectedVisible) await expect(sheet).toContainText(value);
+  for (const value of expectedHidden) await expect(sheet).not.toContainText(value);
 
   await page.keyboard.press('Escape');
-  await expect(drawer).toBeHidden();
+  await expect(sheet).toBeHidden();
 }
 
 async function expectChartTooltipPoint(
@@ -696,7 +696,7 @@ test.describe('Draft Lifecycle', () => {
       await expectVisibleButtons(adminPage, ['See Registered Students']);
     });
 
-    test('registered draftees do not fetch before the drawer opens', async ({ adminPage }) => {
+    test('registered draftees do not fetch before the sheet opens', async ({ adminPage }) => {
       const noResponseBeforeOpen = adminPage.waitForResponse(
         response => new URL(response.url()).pathname === '/dashboard/drafts/1/draftees',
         { timeout: 1000 },
@@ -708,7 +708,7 @@ test.describe('Draft Lifecycle', () => {
       await expect(noResponseBeforeOpen).rejects.toThrow();
     });
 
-    test('registered draftees fetch when the drawer opens', async ({ adminPage }) => {
+    test('registered draftees fetch when the sheet opens', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/drafts/1/');
       await expectVisibleButtons(adminPage, ['See Registered Students']);
       const responsePromise = adminPage.waitForResponse(
@@ -824,7 +824,7 @@ test.describe('Draft Lifecycle', () => {
       await expectVisibleButtons(adminPage, ['Members', 'Preferred', 'Interested']);
     });
 
-    test('pending selection does not fetch before the drawer opens', async ({ adminPage }) => {
+    test('pending selection does not fetch before the sheet opens', async ({ adminPage }) => {
       const noResponseBeforeOpen = adminPage.waitForResponse(
         response => new URL(response.url()).pathname === '/dashboard/drafts/1/draftees',
         { timeout: 1000 },
@@ -836,7 +836,7 @@ test.describe('Draft Lifecycle', () => {
       await expect(noResponseBeforeOpen).rejects.toThrow();
     });
 
-    test('pending selection fetches when the drawer opens', async ({ adminPage }) => {
+    test('pending selection fetches when the sheet opens', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/drafts/1/');
       await expectVisibleButtons(adminPage, ['Pending Selection']);
       const firstResponsePromise = adminPage.waitForResponse(
@@ -846,7 +846,7 @@ test.describe('Draft Lifecycle', () => {
       await firstResponsePromise;
     });
 
-    test('pending selection does not refetch when the drawer reopens', async ({ adminPage }) => {
+    test('pending selection does not refetch when the sheet reopens', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/drafts/1/');
       await expectVisibleButtons(adminPage, ['Pending Selection']);
 
@@ -1149,13 +1149,13 @@ test.describe('Draft Lifecycle', () => {
     test('draft is now in Round 2', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/drafts/1/');
       await expect(adminPage.getByText(/Round 2/u)).toBeVisible();
-      await expectDrawerContents(
+      await expectSheetContents(
         adminPage,
         'Already Drafted',
         [/202012345/u, /202012346/u],
         [/202012349/u, /202012348/u],
       );
-      await expectDrawerContents(
+      await expectSheetContents(
         adminPage,
         'Pending Selection',
         [/202012349/u, /202012348/u, /202012350/u],
@@ -1369,7 +1369,7 @@ test.describe('Draft Lifecycle', () => {
     test('draft is now in Round 3', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/drafts/1/');
       await expect(adminPage.getByText(/Round 3/u)).toBeVisible();
-      await expectDrawerContents(
+      await expectSheetContents(
         adminPage,
         'Already Drafted',
         [/202012345/u, /202012346/u, /202012349/u],
@@ -1566,7 +1566,7 @@ test.describe('Draft Lifecycle', () => {
     test('draft enters lottery phase', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/drafts/1/');
       await expect(adminPage.getByRole('heading', { name: 'Lottery Phase' })).toBeVisible();
-      await expectDrawerContents(
+      await expectSheetContents(
         adminPage,
         'Already Drafted',
         [/202012345/u, /202012346/u, /202012349/u, /202012348/u],
@@ -1574,7 +1574,7 @@ test.describe('Draft Lifecycle', () => {
       );
     });
 
-    test('eligible for lottery does not fetch before the drawer opens', async ({ adminPage }) => {
+    test('eligible for lottery does not fetch before the sheet opens', async ({ adminPage }) => {
       const noResponseBeforeOpen = adminPage.waitForResponse(
         response => new URL(response.url()).pathname === '/dashboard/drafts/1/draftees',
         { timeout: 1000 },
@@ -1586,7 +1586,7 @@ test.describe('Draft Lifecycle', () => {
       await expect(noResponseBeforeOpen).rejects.toThrow();
     });
 
-    test('eligible for lottery fetches when the drawer opens', async ({ adminPage }) => {
+    test('eligible for lottery fetches when the sheet opens', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/drafts/1/');
       await expectVisibleButtons(adminPage, ['Eligible for Lottery']);
       const responsePromise = adminPage.waitForResponse(

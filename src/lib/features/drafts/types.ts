@@ -22,7 +22,7 @@ export interface FacultyChoiceRecord extends Pick<
 
 export interface Draft extends Pick<
   schema.Draft,
-  'id' | 'currRound' | 'maxRounds' | 'registrationClosesAt'
+  'id' | 'currRound' | 'maxRounds' | 'registrationClosedAt' | 'startedAt'
 > {
   /** Derived from the timestamp of the database for best consistency */
   isRegistrationClosed: boolean;

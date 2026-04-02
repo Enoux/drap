@@ -24,7 +24,7 @@
 
   interface Draft extends Pick<
     schema.Draft,
-    'id' | 'currRound' | 'maxRounds' | 'registrationClosesAt'
+    'id' | 'currRound' | 'maxRounds' | 'registrationClosedAt'
   > {
     isRegistrationClosed: boolean;
   }
@@ -71,7 +71,7 @@
         {:else if typeof availableLabs !== 'undefined' && (!draft.isRegistrationClosed || isInAllowlist)}
           <RegistrationOpen {user} {draft} {availableLabs} />
         {:else}
-          <RegistrationClosed registrationClosesAt={draft.registrationClosesAt} />
+          <RegistrationClosed registrationClosedAt={draft.registrationClosedAt} />
         {/if}
       {:else if typeof submission !== 'undefined'}
         <DraftInProgress
@@ -79,7 +79,7 @@
           {submission}
         />
       {:else}
-        <RegistrationClosed registrationClosesAt={draft.registrationClosesAt} />
+        <RegistrationClosed registrationClosedAt={draft.registrationClosedAt} />
       {/if}
     </div>
   {/if}

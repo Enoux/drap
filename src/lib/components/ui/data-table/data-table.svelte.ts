@@ -48,16 +48,17 @@ export function createSvelteTable<TData extends RowData>(options: TableOptions<T
   );
 
   const table = createTable(resolvedOptions);
-  let state = $state<TableState>(table.initialState);
+  let internalState = $state<TableState>(table.initialState);
 
   function updateOptions() {
-    table.setOptions(() => {
-      return mergeObjects(resolvedOptions, options, {
-        state: mergeObjects(state, options.state || {}),
-
+    table.setOptions(prev => {
+      return mergeObjects(prev, options, {
+        get state() {
+          return mergeObjects(internalState, options.state ?? {});
+        },
         onStateChange(updater: Updater<TableState>) {
-          if (updater instanceof Function) state = updater(state);
-          else state = mergeObjects(state, updater);
+          if (updater instanceof Function) internalState = updater(internalState);
+          else internalState = mergeObjects(internalState, updater);
 
           options.onStateChange?.(updater);
         },

@@ -1,45 +1,53 @@
 <script lang="ts">
   import {
-    type ColumnFiltersState,
     createColumnHelper,
     getCoreRowModel,
+    getFacetedRowModel,
+    getFacetedUniqueValues,
     getFilteredRowModel,
     getSortedRowModel,
-    type SortingState,
   } from '@tanstack/table-core';
   import type { Snippet } from 'svelte';
 
-  import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
   import * as Table from '$lib/components/ui/table';
   import DesignatedLab from '$lib/users/designated-lab.svelte';
   import PreferredLab from '$lib/users/preferred-lab.svelte';
-  import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
   import { createSvelteTable, FlexRender, renderComponent } from '$lib/components/ui/data-table';
+  import { Input } from '$lib/components/ui/input';
   import type { Student } from '$lib/features/drafts/types';
 
+  import LateNameCell from './late-name-cell.svelte';
+  import MultiSelectFilterHeader from './multi-select-filter-header.svelte';
+  import SingleSelectFilterHeader from './single-select-filter-header.svelte';
   import SortByHeader from './sort-by-header.svelte';
 
-  interface Props {
-    data: Student[];
-    children?: Snippet;
+  interface ExtendedStudent extends Student {
+    isLate?: boolean;
   }
 
-  const { data, children }: Props = $props();
+  interface Props {
+    data: ExtendedStudent[];
+    children?: Snippet;
+    variant?: 'default' | 'registration-sheet';
+  }
+
+  const { data, children, variant }: Props = $props();
 
   // Shape the table columns
-  const columnHelper = createColumnHelper<Student>();
+  const columnHelper = createColumnHelper<ExtendedStudent>();
   const columns = [
     columnHelper.accessor(({ studentNumber }) => studentNumber, {
       id: 'studentNumber',
+      enableGlobalFilter: false,
       header: header =>
         renderComponent(SortByHeader, {
           header: 'Student Number',
           onclick: header.column.getToggleSortingHandler(),
+          sortState: header.column.getIsSorted(),
         }),
       cell: info => info.getValue(),
     }),
-
     columnHelper.accessor(
       ({ familyName, givenName }) => `${familyName.toUpperCase()}, ${givenName}`,
       {
@@ -48,48 +56,76 @@
           renderComponent(SortByHeader, {
             header: 'Name',
             onclick: header.column.getToggleSortingHandler(),
+            sortState: header.column.getIsSorted(),
           }),
-        cell: info => info.getValue(),
+        cell: ({ getValue, row }) =>
+          renderComponent(LateNameCell, { isLate: row.original.isLate ?? false, name: getValue() }),
       },
     ),
-
     columnHelper.accessor(({ email }) => email, {
       id: 'email',
       header: header =>
         renderComponent(SortByHeader, {
           header: 'Email',
           onclick: header.column.getToggleSortingHandler(),
+          sortState: header.column.getIsSorted(),
         }),
       cell: info => info.getValue(),
     }),
-
     columnHelper.accessor(({ labId }) => labId, {
       id: 'labId',
-      header: 'Designated Lab',
+      enableGlobalFilter: false,
+      header(header) {
+        const filterValue = header.column.getFilterValue();
+        return renderComponent(SingleSelectFilterHeader, {
+          header: 'Designated Lab',
+          filtered: header.column.getIsFiltered(),
+          onValueChange(value) {
+            header.column.setFilterValue(value === '' ? null : value);
+          },
+          options: Array.from(header.column.getFacetedUniqueValues().entries())
+            .filter(([value]) => typeof value === 'string')
+            .sort((left, right) => left[0].localeCompare(right[0]))
+            .map(([value, count]) => ({ count, value })),
+          value: typeof filterValue === 'string' ? filterValue : '',
+        });
+      },
       cell: info => renderComponent(DesignatedLab, { labId: info.getValue() }),
       filterFn: 'equalsString',
     }),
-
     columnHelper.accessor(({ labs }) => labs, {
       id: 'labs',
-      header: 'Lab Preferences',
+      enableGlobalFilter: false,
+      header(header) {
+        const filterValue = header.column.getFilterValue();
+
+        return renderComponent(MultiSelectFilterHeader, {
+          header: 'Lab Preferences',
+          filtered: header.column.getIsFiltered(),
+          onValueChange(values) {
+            header.column.setFilterValue(values.length === 0 ? null : values);
+          },
+          options: Array.from(header.column.getFacetedUniqueValues().entries())
+            .filter(([value]) => typeof value === 'string')
+            .sort((left, right) => left[0].localeCompare(right[0]))
+            .map(([value, count]) => ({ count, value })),
+          values: Array.isArray(filterValue)
+            ? filterValue.filter(lab => typeof lab === 'string')
+            : [],
+        });
+      },
       cell: info => renderComponent(PreferredLab, { labs: info.getValue() }),
       filterFn: 'arrIncludesSome',
+      getUniqueValues: ({ labs }) => labs,
+    }),
+    columnHelper.accessor(({ isLate }) => isLate ?? false, {
+      id: 'isLate',
+      enableGlobalFilter: false,
+      header: 'Late',
+      filterFn: 'equals',
+      cell: info => info.getValue(),
     }),
   ];
-
-  // Store table states
-  let sorting: SortingState = $state([]);
-  let columnFilters: ColumnFiltersState = $state([]);
-
-  // Get all possible labs for filtering
-  const designatedLabFilters = $derived(
-    [...new Set(data.map(({ labId }) => labId))].filter(labId => labId !== null).sort(),
-  );
-  let designatedLabFilterValue = $state('');
-
-  const preferredLabFilters = $derived([...new Set(data.flatMap(({ labs }) => labs))].sort());
-  let preferredLabFilterValues: string[] = $state([]);
 
   // This only initializes lazily on load.
   // We put it here so that we don't needlessly initialize state
@@ -98,130 +134,55 @@
     createSvelteTable({
       data,
       columns,
-
-      // Normal state
+      initialState: {
+        columnVisibility: {
+          isLate: false,
+        },
+      },
+      getFacetedRowModel: getFacetedRowModel(),
+      getFacetedUniqueValues: getFacetedUniqueValues(),
       getCoreRowModel: getCoreRowModel(),
-
-      // Sorted state
       getSortedRowModel: getSortedRowModel(),
-      onSortingChange(updater) {
-        sorting = typeof updater === 'function' ? updater(sorting) : updater;
-      },
-
-      // Filtered state
       getFilteredRowModel: getFilteredRowModel(),
-      onColumnFiltersChange(updater) {
-        columnFilters = typeof updater === 'function' ? updater(columnFilters) : updater;
-      },
-
-      // List of table states
-      state: {
-        sorting,
-        columnFilters,
-      },
     }),
   );
+
+  const headerGroups = $derived(table.getHeaderGroups());
+  const rows = $derived(table.getRowModel().rows);
+  const visibleColumnCount = $derived(table.getVisibleLeafColumns().length);
+  const globalFilter = $derived.by(() => {
+    const value = table.getState().globalFilter;
+    return typeof value === 'string' ? value : '';
+  });
+  const lateOnly = $derived(table.getColumn('isLate')?.getFilterValue() === true);
 </script>
 
-<!-- Filter Buttons -->
-<div class="mx-4 mb-4 flex items-center justify-end gap-2">
-  <!-- Designated Labs -->
-  {#if designatedLabFilters.length > 0}
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger>
-        <Button
-          variant="outline"
-          class={designatedLabFilterValue === '' ? '' : 'border-secondary text-secondary'}
-        >
-          Designated Lab: {designatedLabFilterValue === ''
-            ? 'All'
-            : designatedLabFilterValue.toUpperCase()}
-        </Button>
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Content>
-        <DropdownMenu.Item
-          onclick={() => {
-            designatedLabFilterValue = '';
-            table.getColumn('labId')?.setFilterValue(designatedLabFilterValue);
-          }}
-        >
-          Clear Filter
-        </DropdownMenu.Item>
-        {#each designatedLabFilters as filter (filter)}
-          <DropdownMenu.Item
-            onclick={() => {
-              designatedLabFilterValue = designatedLabFilterValue === filter ? '' : filter;
-              table.getColumn('labId')?.setFilterValue(designatedLabFilterValue);
-            }}
-          >
-            {#if designatedLabFilterValue === filter}
-              <Badge variant="outline" class="mr-1 border-primary bg-primary/10 text-xs uppercase">
-                {filter.toUpperCase()}
-              </Badge>
-            {:else}
-              <Badge variant="outline" class="mr-1 border-muted bg-muted/10 text-xs uppercase">
-                {filter.toUpperCase()}
-              </Badge>
-            {/if}
-          </DropdownMenu.Item>
-        {/each}
-      </DropdownMenu.Content>
-    </DropdownMenu.Root>
-  {/if}
-
-  <!-- Lab Preferences -->
-  {#if preferredLabFilters.length > 0}
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger>
-        <Button
-          variant="outline"
-          class={preferredLabFilterValues.length === 0 ? '' : 'border-secondary text-secondary'}
-        >
-          Lab Preference: {preferredLabFilterValues.length === 0 ||
-          preferredLabFilterValues.length === preferredLabFilters.length
-            ? 'All'
-            : preferredLabFilterValues.map(lab => lab.toUpperCase()).join(', ')}
-        </Button>
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Content>
-        <DropdownMenu.Item
-          onclick={() => {
-            preferredLabFilterValues = [];
-            table.getColumn('labs')?.setFilterValue(preferredLabFilterValues);
-          }}
-        >
-          Clear Filters
-        </DropdownMenu.Item>
-        {#each preferredLabFilters as filter (filter)}
-          <DropdownMenu.Item
-            onclick={() => {
-              preferredLabFilterValues = preferredLabFilterValues.includes(filter)
-                ? preferredLabFilterValues.filter(lab => lab !== filter)
-                : [...preferredLabFilterValues, filter];
-              table.getColumn('labs')?.setFilterValue(preferredLabFilterValues);
-            }}
-          >
-            {#if preferredLabFilterValues.includes(filter)}
-              <Badge variant="outline" class="mr-1 border-primary bg-primary/10 text-xs uppercase">
-                {filter.toUpperCase()}
-              </Badge>
-            {:else}
-              <Badge variant="outline" class="mr-1 border-muted bg-muted/10 text-xs uppercase">
-                {filter.toUpperCase()}
-              </Badge>
-            {/if}
-          </DropdownMenu.Item>
-        {/each}
-      </DropdownMenu.Content>
-    </DropdownMenu.Root>
-  {/if}
-</div>
+{#if variant === 'registration-sheet'}
+  <div class="mx-4 mb-4 flex gap-2">
+    <Input
+      placeholder="Search students..."
+      value={globalFilter}
+      oninput={event => {
+        table.setGlobalFilter(event.currentTarget.value === '' ? null : event.currentTarget.value);
+      }}
+      class="flex-1"
+    />
+    <Button
+      variant={lateOnly ? 'secondary' : 'outline'}
+      onclick={() => {
+        table.getColumn('isLate')?.setFilterValue(lateOnly ? null : true);
+      }}
+    >
+      Late Only
+    </Button>
+  </div>
+{/if}
 
 <!-- Table -->
 <div class="mx-4 rounded-sm">
   <Table.Root>
     <Table.Header>
-      {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
+      {#each headerGroups as headerGroup (headerGroup.id)}
         <Table.Row>
           {#each headerGroup.headers as header (header.id)}
             <Table.Head colspan={header.colSpan}>
@@ -237,7 +198,7 @@
       {/each}
     </Table.Header>
     <Table.Body>
-      {#each table.getRowModel().rows as row (row.id)}
+      {#each rows as row (row.id)}
         <Table.Row>
           {#each row.getVisibleCells() as cell (cell.id)}
             <Table.Cell>
@@ -247,8 +208,12 @@
         </Table.Row>
       {:else}
         <Table.Row>
-          <Table.Cell colspan={columns.length}>
-            <p class="text-center my-8 text-xl empty:hidden">{@render children?.()}</p>
+          <Table.Cell colspan={visibleColumnCount}>
+            {#if variant === 'registration-sheet'}
+              <div class="my-8">{@render children?.()}</div>
+            {:else}
+              <p class="text-center my-8 text-xl empty:hidden">{@render children?.()}</p>
+            {/if}
           </Table.Cell>
         </Table.Row>
       {/each}

@@ -204,6 +204,13 @@
       "when": 1773940754906,
       "tag": "0028_add-draft-registration-allowlist-table",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1774977026637,
+      "tag": "0029_add-registration-closed-at-and-started-at",
+      "breakpoints": true
     }
   ]
 }

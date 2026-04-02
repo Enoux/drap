@@ -13,6 +13,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  lt,
   lte,
   ne,
   or,
@@ -64,7 +65,7 @@ function coerceNumber(value: unknown) {
   throw new CoercionError('expected a number');
 }
 
-const isRegistrationClosed = sql`${schema.draft.registrationClosesAt} < now()`
+const isRegistrationClosed = lt(schema.draft.registrationClosedAt, sql`now()`)
   .mapWith(Boolean)
   .as('is_registration_closed');
 
@@ -640,7 +641,7 @@ export async function getDrafts(db: DbConnection) {
         id: schema.draft.id,
         currRound: schema.draft.currRound,
         maxRounds: schema.draft.maxRounds,
-        registrationClosesAt: schema.draft.registrationClosesAt,
+        registrationClosedAt: schema.draft.registrationClosedAt,
         isRegistrationClosed,
         activePeriodStart: sql`lower(${schema.draft.activePeriod})`
           .mapWith(coerceDate)
@@ -648,6 +649,7 @@ export async function getDrafts(db: DbConnection) {
         activePeriodEnd: sql`upper(${schema.draft.activePeriod})`
           .mapWith(coerceNullableDate)
           .as('_end'),
+        startedAt: schema.draft.startedAt,
       })
       .from(schema.draft)
       .orderBy(({ activePeriodStart }) => sql`${desc(activePeriodStart)} NULLS FIRST`);
@@ -661,7 +663,8 @@ export async function getDraftById(db: DbConnection, id: bigint) {
       .select({
         currRound: schema.draft.currRound,
         maxRounds: schema.draft.maxRounds,
-        registrationClosesAt: schema.draft.registrationClosesAt,
+        registrationClosedAt: schema.draft.registrationClosedAt,
+        startedAt: schema.draft.startedAt,
         isRegistrationClosed,
         activePeriodStart: sql`lower(${schema.draft.activePeriod})`.mapWith(coerceDate),
         activePeriodEnd: sql`upper(${schema.draft.activePeriod})`.mapWith(coerceNullableDate),
@@ -679,7 +682,8 @@ export async function getDraftByIdForUpdate(db: DrizzleTransaction, id: bigint) 
       .select({
         currRound: schema.draft.currRound,
         maxRounds: schema.draft.maxRounds,
-        registrationClosesAt: schema.draft.registrationClosesAt,
+        registrationClosedAt: schema.draft.registrationClosedAt,
+        startedAt: schema.draft.startedAt,
         isRegistrationClosed,
         activePeriodStart: sql`lower(${schema.draft.activePeriod})`.mapWith(coerceDate),
         activePeriodEnd: sql`upper(${schema.draft.activePeriod})`.mapWith(coerceNullableDate),
@@ -698,7 +702,8 @@ export async function getActiveDraft(db: DbConnection) {
         id: schema.draft.id,
         currRound: schema.draft.currRound,
         maxRounds: schema.draft.maxRounds,
-        registrationClosesAt: schema.draft.registrationClosesAt,
+        registrationClosedAt: schema.draft.registrationClosedAt,
+        startedAt: schema.draft.startedAt,
         isRegistrationClosed,
         activePeriodStart: sql`lower(${schema.draft.activePeriod})`.mapWith(coerceDate),
         activePeriodEnd: sql`upper(${schema.draft.activePeriod})`.mapWith(coerceNullableDate),
@@ -723,7 +728,7 @@ export async function getDraftByIdForShare(db: DrizzleTransaction, id: bigint) {
       .select({
         currRound: schema.draft.currRound,
         maxRounds: schema.draft.maxRounds,
-        registrationClosesAt: schema.draft.registrationClosesAt,
+        registrationClosedAt: schema.draft.registrationClosedAt,
         isRegistrationClosed,
         activePeriodStart: sql`lower(${schema.draft.activePeriod})`.mapWith(coerceDate),
         activePeriodEnd: sql`upper(${schema.draft.activePeriod})`.mapWith(coerceNullableDate),
@@ -1257,7 +1262,7 @@ export async function validateStudentsChoseLabInRound(
 export async function initDraft(
   db: DrizzleTransaction,
   maxRounds: number,
-  registrationClosesAt: Date,
+  registrationClosedAt: Date,
 ) {
   return await tracer.asyncSpan('init-draft', async span => {
     span.setAttribute('database.draft.max_rounds', maxRounds);
@@ -1267,7 +1272,7 @@ export async function initDraft(
 
     const draft = await db
       .insert(schema.draft)
-      .values({ maxRounds, registrationClosesAt })
+      .values({ maxRounds, registrationClosedAt })
       .returning({
         id: schema.draft.id,
         activePeriodStart: sql`lower(${schema.draft.activePeriod})`.mapWith(coerceDate),
@@ -1303,6 +1308,18 @@ export async function incrementDraftRound(db: DbConnection, draftId: bigint) {
         maxRounds: schema.draft.maxRounds,
       })
       .then(assertOptional);
+  });
+}
+
+export async function markDraftAsStarted(db: DbConnection, draftId: bigint) {
+  return await tracer.asyncSpan('mark-draft-as-started', async span => {
+    span.setAttribute('database.draft.id', draftId.toString());
+    return await db
+      .update(schema.draft)
+      .set({ startedAt: sql`now()` })
+      .where(eq(schema.draft.id, draftId))
+      .returning({ startedAt: sql`${schema.draft.startedAt}`.mapWith(coerceDate) })
+      .then(assertSingle);
   });
 }
 
@@ -2283,5 +2300,78 @@ export async function isRegisteredOrAssignedInDraft(
 
     logger.debug('not registered or assigned');
     return false;
+  });
+}
+
+export async function getLateRegistrantsByDraft(db: DbConnection, draftId: bigint) {
+  return await tracer.asyncSpan('get-late-registrants-by-draft', async span => {
+    span.setAttribute('database.draft.id', draftId.toString());
+    return await db
+      .select({
+        id: schema.user.id,
+        email: schema.user.email,
+        givenName: schema.user.givenName,
+        familyName: schema.user.familyName,
+        avatarUrl: schema.user.avatarUrl,
+        studentNumber: schema.user.studentNumber,
+        labs: sql`coalesce(array_agg(${schema.studentRankLab.labId} order by ${schema.studentRankLab.index}) filter (where ${isNotNull(schema.studentRankLab.labId)}), '{}')`
+          .mapWith(value => parse(StringArray, value))
+          .as('labs'),
+        labId: schema.facultyChoiceUser.labId,
+      })
+      .from(schema.studentRank)
+      .innerJoin(schema.user, eq(schema.studentRank.userId, schema.user.id))
+      .innerJoin(schema.draft, eq(schema.studentRank.draftId, schema.draft.id))
+      .leftJoin(
+        schema.facultyChoiceUser,
+        and(
+          eq(schema.studentRank.draftId, schema.facultyChoiceUser.draftId),
+          eq(schema.studentRank.userId, schema.facultyChoiceUser.studentUserId),
+        ),
+      )
+      .leftJoin(
+        schema.studentRankLab,
+        and(
+          eq(schema.studentRank.draftId, schema.studentRankLab.draftId),
+          eq(schema.studentRank.userId, schema.studentRankLab.userId),
+        ),
+      )
+      .where(
+        and(
+          eq(schema.studentRank.draftId, draftId),
+          lt(schema.draft.registrationClosedAt, schema.studentRank.createdAt),
+        ),
+      )
+      .groupBy(schema.user.id, schema.facultyChoiceUser.labId)
+      .orderBy(schema.user.familyName);
+  });
+}
+
+export async function getLateRegistrantsCountByDraft(db: DbConnection, draftId: bigint) {
+  return await tracer.asyncSpan('get-late-registrants-count-by-draft', async span => {
+    span.setAttribute('database.draft.id', draftId.toString());
+    const { result } = await db
+      .select({ result: count(schema.studentRank.userId) })
+      .from(schema.studentRank)
+      .innerJoin(schema.draft, eq(schema.studentRank.draftId, schema.draft.id))
+      .where(
+        and(
+          eq(schema.studentRank.draftId, draftId),
+          lt(schema.draft.registrationClosedAt, schema.studentRank.createdAt),
+        ),
+      )
+      .then(assertSingle);
+    return result;
+  });
+}
+
+export async function getDraftRegistrationTimeline(db: DbConnection, id: bigint) {
+  return await tracer.asyncSpan('get-draft-registration-timeline', async span => {
+    span.setAttribute('database.draft.id', id.toString());
+    return await db.query.studentRank.findMany({
+      columns: { createdAt: true },
+      where: ({ draftId }, { eq }) => eq(draftId, id),
+      orderBy: ({ createdAt }) => createdAt,
+    });
   });
 }

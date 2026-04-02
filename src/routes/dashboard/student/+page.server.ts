@@ -94,7 +94,7 @@ export async function load({ locals: { session } }) {
       return { user: baseUser, lab };
     }
 
-    const { id: draftId, currRound, maxRounds, registrationClosesAt, isRegistrationClosed } = draft;
+    const { id: draftId, currRound, maxRounds, registrationClosedAt, isRegistrationClosed } = draft;
     logger.debug('active draft found', {
       'draft.id': draftId.toString(),
       'draft.round.current': currRound,
@@ -106,7 +106,7 @@ export async function load({ locals: { session } }) {
       logger.debug('draft in lottery or review phase');
       return {
         user: baseUser,
-        draft: { id: draftId, currRound, maxRounds, registrationClosesAt, isRegistrationClosed },
+        draft: { id: draftId, currRound, maxRounds, registrationClosedAt, isRegistrationClosed },
         lab,
       };
     }
@@ -132,7 +132,7 @@ export async function load({ locals: { session } }) {
         logger.debug('user already submitted rankings');
         return {
           user: baseUser,
-          draft: { id: draftId, currRound, maxRounds, registrationClosesAt, isRegistrationClosed },
+          draft: { id: draftId, currRound, maxRounds, registrationClosedAt, isRegistrationClosed },
           submission: buildSubmission(rankings),
           lab,
         };
@@ -145,7 +145,7 @@ export async function load({ locals: { session } }) {
         const availableLabs = await getDraftLabRegistry(db, draftId);
         return {
           user: baseUser,
-          draft: { id: draftId, currRound, maxRounds, registrationClosesAt, isRegistrationClosed },
+          draft: { id: draftId, currRound, maxRounds, registrationClosedAt, isRegistrationClosed },
           availableLabs: availableLabs.map(({ id, name }) => ({ id, name })),
           lab,
         };
@@ -156,7 +156,7 @@ export async function load({ locals: { session } }) {
         const availableLabs = await getDraftLabRegistry(db, draftId);
         return {
           user: baseUser,
-          draft: { id: draftId, currRound, maxRounds, registrationClosesAt, isRegistrationClosed },
+          draft: { id: draftId, currRound, maxRounds, registrationClosedAt, isRegistrationClosed },
           availableLabs: availableLabs.map(({ id, name }) => ({ id, name })),
           lab,
           isInAllowlist: true,
@@ -168,7 +168,7 @@ export async function load({ locals: { session } }) {
       logger.debug('registration closed, user missed registration');
       return {
         user: baseUser,
-        draft: { id: draftId, currRound, maxRounds, registrationClosesAt, isRegistrationClosed },
+        draft: { id: draftId, currRound, maxRounds, registrationClosedAt, isRegistrationClosed },
         lab,
       };
     }
@@ -179,7 +179,7 @@ export async function load({ locals: { session } }) {
       logger.debug('draft in progress, user submitted');
       return {
         user: baseUser,
-        draft: { id: draftId, currRound, maxRounds, registrationClosesAt, isRegistrationClosed },
+        draft: { id: draftId, currRound, maxRounds, registrationClosedAt, isRegistrationClosed },
         submission: buildSubmission(rankings),
         lab,
       };
@@ -189,7 +189,7 @@ export async function load({ locals: { session } }) {
     logger.debug('draft in progress, user missed registration');
     return {
       user: baseUser,
-      draft: { id: draftId, currRound, maxRounds, registrationClosesAt, isRegistrationClosed },
+      draft: { id: draftId, currRound, maxRounds, registrationClosedAt, isRegistrationClosed },
       lab,
     };
   });
@@ -257,7 +257,7 @@ export const actions = {
             error(404);
           }
 
-          const { currRound, maxRounds, registrationClosesAt, isRegistrationClosed } = draft;
+          const { currRound, maxRounds, registrationClosedAt, isRegistrationClosed } = draft;
           logger.debug('max rounds for target draft determined', { 'draft.round.max': maxRounds });
           if (currRound !== 0) {
             logger.fatal('cannot submit rankings to an ongoing draft', void 0, {
@@ -275,7 +275,7 @@ export const actions = {
               );
             } else {
               logger.fatal('attempt to submit rankings after registration closed', void 0, {
-                'draft.registration.closes_at': registrationClosesAt.toISOString(),
+                'draft.registration.closes_at': registrationClosedAt.toISOString(),
               });
               error(403);
             }

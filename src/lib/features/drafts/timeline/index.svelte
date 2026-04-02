@@ -24,6 +24,10 @@
     | 'review'
     | 'finalized';
 
+  interface TimelineData {
+    createdAt: Date;
+  }
+
   interface Props {
     draftId: bigint;
     requestedAt: Date;
@@ -32,6 +36,8 @@
     studentCount: number;
     finalized: DraftFinalizedBreakdown;
     allowlistCount: number;
+    lateRegistrantsCount: number;
+    timelineData: TimelineData[];
   }
 
   const {
@@ -42,6 +48,8 @@
     studentCount,
     finalized,
     allowlistCount,
+    lateRegistrantsCount,
+    timelineData,
   }: Props = $props();
   const draftId = $derived(rawDraftId.toString());
 
@@ -51,7 +59,7 @@
     if (draft.currRound === null) return 'review';
     if (draft.currRound === 0)
       return draft.isRegistrationClosed ? 'registration-closed' : 'registration';
-    if (draft.currRound !== null && draft.currRound > draft.maxRounds) return 'intervention';
+    if (draft.currRound > draft.maxRounds) return 'intervention';
     return 'regular';
   });
 
@@ -248,7 +256,16 @@
           snapshots={finalized.snapshots}
         />
       {:else}
-        <RegistrationCompleted {draftId} {studentCount} />
+        <RegistrationCompleted
+          {draftId}
+          {requestedAt}
+          draftCreatedAt={draft.activePeriodStart}
+          registrationClosedAt={draft.registrationClosedAt}
+          startedAt={draft.startedAt}
+          {timelineData}
+          {studentCount}
+          {lateRegistrantsCount}
+        />
       {/if}
     </Step>
   </div>

@@ -1,22 +1,54 @@
 <script lang="ts">
-  import RegisteredDraftees from '$lib/features/drafts/draftees/registered/index.svelte';
+  import RegistrantsChart from './registrants-chart.svelte';
+
+  import DrafteesSheet from './draftees-sheet/index.svelte';
+
+  interface TimelineData {
+    createdAt: Date;
+  }
 
   interface Props {
     draftId: string;
+    draftCreatedAt: Date;
+    registrationClosedAt: Date;
+    startedAt: Date | null;
+    requestedAt: Date;
+    timelineData: TimelineData[];
     studentCount: number;
+    lateRegistrantsCount: number;
   }
 
-  const { draftId, studentCount }: Props = $props();
+  const {
+    draftId,
+    draftCreatedAt,
+    registrationClosedAt,
+    startedAt,
+    requestedAt,
+    timelineData,
+    studentCount,
+    lateRegistrantsCount,
+  }: Props = $props();
 </script>
 
-<div class="space-y-4">
+<div class="space-y-6">
   <div class="prose dark:prose-invert">
     <p>
-      <strong>{studentCount}</strong> students registered for this draft before registration closed.
+      <strong>{studentCount}</strong> students registered for this draft.
     </p>
+    {#if lateRegistrantsCount > 0}
+      <p>
+        <strong>{lateRegistrantsCount}</strong> students registered after registration closed.
+      </p>
+    {/if}
   </div>
-  <div class="flex items-center justify-center">
-    <RegisteredDraftees {draftId} variant="primary">No students have registered.</RegisteredDraftees
-    >
+  <RegistrantsChart
+    {draftCreatedAt}
+    {registrationClosedAt}
+    {startedAt}
+    {requestedAt}
+    {timelineData}
+  />
+  <div class="flex justify-end">
+    <DrafteesSheet {draftId} />
   </div>
 </div>

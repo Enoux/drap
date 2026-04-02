@@ -8,14 +8,14 @@
 
   interface Props {
     user: Pick<schema.User, 'id'>;
-    draft: Pick<schema.Draft, 'id' | 'maxRounds' | 'registrationClosesAt'>;
+    draft: Pick<schema.Draft, 'id' | 'maxRounds' | 'registrationClosedAt'>;
     availableLabs: Pick<schema.Lab, 'id' | 'name'>[];
   }
 
   let { user, draft, availableLabs = $bindable() }: Props = $props();
 
-  const closeDate = $derived(format(draft.registrationClosesAt, 'PPP'));
-  const closeTime = $derived(format(draft.registrationClosesAt, 'pp'));
+  const closeDate = $derived(format(draft.registrationClosedAt, 'PPP'));
+  const closeTime = $derived(format(draft.registrationClosedAt, 'pp'));
 </script>
 
 <div class="space-y-6 pb-12">

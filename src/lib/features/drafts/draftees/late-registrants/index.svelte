@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tv } from 'tailwind-variants';
 
-  import * as Sheet from '$lib/components/ui/sheet';
+  import * as Drawer from '$lib/components/ui/drawer';
   import { Button } from '$lib/components/ui/button';
 
   import Loader, { type Props as LoaderProps } from './loader.svelte';
@@ -22,21 +22,17 @@
   const { variant, ...props }: Props = $props();
 </script>
 
-<Sheet.Root>
-  <Sheet.Trigger>
+<Drawer.Root>
+  <Drawer.Trigger>
     {#snippet child({ props })}
       <Button variant="outline" class={triggerVariants({ variant })} {...props}>
-        See Registered Students
+        See Late Registrants
       </Button>
     {/snippet}
-  </Sheet.Trigger>
-  <Sheet.Content side="right" class="flex w-full flex-col overflow-hidden sm:max-w-[600px]">
-    <Sheet.Header>
-      <Sheet.Title>Registered Students</Sheet.Title>
-      <Sheet.Description>Review students who have registered for this draft.</Sheet.Description>
-    </Sheet.Header>
-    <div class="flex min-h-0 grow flex-col overflow-y-auto px-4 pb-4">
+  </Drawer.Trigger>
+  <Drawer.Content class="min-h-screen">
+    <div class="overflow-auto px-8 pb-40">
       <Loader {...props} />
     </div>
-  </Sheet.Content>
-</Sheet.Root>
+  </Drawer.Content>
+</Drawer.Root>

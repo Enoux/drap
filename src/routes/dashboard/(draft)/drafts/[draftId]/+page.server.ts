@@ -16,8 +16,10 @@ import {
   getDraftByIdForUpdate,
   getDraftLabQuotaLabIds,
   getDraftLabQuotaSnapshots,
+  getDraftRegistrationTimeline,
   getFacultyAndStaff,
   getLabById,
+  getLateRegistrantsCountByDraft,
   getPendingLabCountInDraft,
   getStudentCountInDraft,
   getUserByEmail,
@@ -25,6 +27,7 @@ import {
   incrementDraftRound,
   insertLotteryChoices,
   isRegisteredOrAssignedInDraft,
+  markDraftAsStarted,
   randomizeRemainingStudents,
   removeFromAllowlist,
   syncResultsToUsers,
@@ -98,12 +101,26 @@ export async function load({ params, locals: { session } }) {
       error(404);
     }
 
-    const [studentCount, assignments, quotaSnapshots, allowlistCount] = await Promise.all([
-      getStudentCountInDraft(db, draftId),
-      getDraftAssignmentRecords(db, draftId),
-      getDraftLabQuotaSnapshots(db, draftId),
-      getAllowlistCountByDraft(db, draftId),
-    ]);
+    const {
+      studentCount,
+      assignments,
+      quotaSnapshots,
+      allowlistCount,
+      lateRegistrantsCount,
+      timelineData,
+    } = await db.transaction(
+      // Needs to be done sequentially because parallel queries in a transaction are not supported.
+      async db => ({
+        studentCount: await getStudentCountInDraft(db, draftId),
+        assignments: await getDraftAssignmentRecords(db, draftId),
+        quotaSnapshots: await getDraftLabQuotaSnapshots(db, draftId),
+        allowlistCount: await getAllowlistCountByDraft(db, draftId),
+        lateRegistrantsCount: await getLateRegistrantsCountByDraft(db, draftId),
+        timelineData: await getDraftRegistrationTimeline(db, draftId),
+      }),
+      { isolationLevel: 'repeatable read' },
+    );
+
     const labs = quotaSnapshots.map(({ labId, labName, initialQuota }) => ({
       id: labId,
       name: labName,
@@ -160,6 +177,8 @@ export async function load({ params, locals: { session } }) {
         },
       },
       allowlistCount,
+      lateRegistrantsCount,
+      timelineData,
     };
   });
 }
@@ -270,6 +289,9 @@ export const actions = {
             logger.warn('no students in draft');
             return false;
           }
+
+          const { startedAt } = await markDraftAsStarted(db, draftId);
+          logger.info('draft officially started', { 'draft.started_at': startedAt.toISOString() });
 
           while (true) {
             const draftRound = await incrementDraftRound(db, draftId);
