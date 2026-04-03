@@ -6,7 +6,7 @@
   import * as Alert from '$lib/components/ui/alert';
   import * as Card from '$lib/components/ui/card';
   import DraftAssignments from '$lib/features/drafts/assignments/index.svelte';
-  import type { Draft, DraftAssignmentCountByAttribute, Lab } from '$lib/features/drafts/types';
+  import type { Draft, DraftAssignmentSummary } from '$lib/features/drafts/types';
 
   import DraftRoundsChart from './draft-rounds-chart.svelte';
 
@@ -14,31 +14,11 @@
     draftId: string;
     draft: Pick<Draft, 'activePeriodStart' | 'activePeriodEnd' | 'maxRounds'>;
     totalStudents: number;
-    totalParticipatingLabs: number;
-    labs: Lab[];
+    assignmentSummary: DraftAssignmentSummary;
     isReview: boolean;
-    assignmentCountsByAttribute: DraftAssignmentCountByAttribute[];
   }
 
-  const {
-    draftId,
-    draft,
-    totalStudents,
-    totalParticipatingLabs,
-    labs,
-    isReview,
-    assignmentCountsByAttribute,
-  }: Props = $props();
-  const interventionDraftedCount = $derived(
-    assignmentCountsByAttribute
-      .filter(({ round }) => round !== null && round === draft.maxRounds + 1)
-      .reduce((acc, record) => acc + record.count, 0),
-  );
-  const lotteryDraftedCount = $derived(
-    assignmentCountsByAttribute
-      .filter(({ round }) => round === null)
-      .reduce((acc, record) => acc + record.count, 0),
-  );
+  const { draftId, draft, totalStudents, assignmentSummary, isReview }: Props = $props();
 </script>
 
 <div class="@container space-y-4">
@@ -78,7 +58,7 @@
       <Card.Header>
         <Card.Title class="text-md font-semibold tabular-nums">Participating Labs</Card.Title>
         <Card.Title id="stat-participating-labs" class="text-4xl font-semibold tabular-nums">
-          {totalParticipatingLabs}
+          {assignmentSummary.metrics.participatingLabCount}
         </Card.Title>
       </Card.Header>
       <Card.Footer class="flex-col items-start gap-1.5 text-sm">
@@ -100,7 +80,7 @@
       <Card.Header>
         <Card.Title class="text-md font-semibold tabular-nums">Interventions</Card.Title>
         <Card.Title id="quota-interventions" class="text-4xl font-semibold tabular-nums">
-          {interventionDraftedCount}
+          {assignmentSummary.metrics.interventionDraftedCount}
         </Card.Title>
       </Card.Header>
       <Card.Footer class="flex-col items-start gap-1.5 text-sm">
@@ -111,7 +91,7 @@
       <Card.Header>
         <Card.Title class="text-md font-semibold tabular-nums">Lottery Assignments</Card.Title>
         <Card.Title id="stat-lottery-assignments" class="text-4xl font-semibold tabular-nums">
-          {lotteryDraftedCount}
+          {assignmentSummary.metrics.lotteryDraftedCount}
         </Card.Title>
       </Card.Header>
       <Card.Footer class="flex-col items-start gap-1.5 text-sm">
@@ -119,11 +99,6 @@
       </Card.Footer>
     </Card.Root>
   </div>
-  <DraftRoundsChart
-    {assignmentCountsByAttribute}
-    maxRounds={draft.maxRounds}
-    {labs}
-    {totalStudents}
-  />
+  <DraftRoundsChart chart={assignmentSummary.chart} />
   <DraftAssignments {draftId} maxRounds={draft.maxRounds} />
 </div>

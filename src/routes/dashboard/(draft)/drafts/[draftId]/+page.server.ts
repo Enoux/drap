@@ -46,6 +46,8 @@ import { inngest } from '$lib/server/inngest/client';
 import { Logger } from '$lib/server/telemetry/logger';
 import { Tracer } from '$lib/server/telemetry/tracer';
 
+import { buildDraftAssignmentSummary } from './assignment-summary.server';
+
 const enum AllowlistAddResult {
   NotAStudent = -3,
   UserNotFound = -2,
@@ -133,6 +135,12 @@ export async function load({ params, locals: { session } }) {
       'draft.round.current': draft.currRound,
       'draft.round.max': draft.maxRounds,
     });
+    const assignmentSummary = buildDraftAssignmentSummary(
+      assignmentCountsByAttribute,
+      labs,
+      draft.maxRounds,
+      studentCount,
+    );
 
     return {
       draftId,
@@ -144,10 +152,10 @@ export async function load({ params, locals: { session } }) {
         ...row,
         finalizedQuota: row.initialQuota + row.lotteryQuota,
       })),
+      assignmentSummary,
       allowlistCount,
       lateRegistrantsCount,
       timelineData,
-      assignmentCountsByAttribute,
     };
   });
 }

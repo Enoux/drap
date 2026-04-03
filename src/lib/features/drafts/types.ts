@@ -56,6 +56,36 @@ export interface DraftAssignmentCountByAttribute {
   count: number;
 }
 
+export interface DraftAssignmentSummaryPhase {
+  key: string;
+  axisLabel: string;
+  tooltipLabel: string;
+}
+
+export interface DraftAssignmentSummarySeries {
+  capacity: number;
+  assignedByPhase: number[];
+  assignedMax: number;
+}
+
+export interface DraftAssignmentSummaryLab extends DraftAssignmentSummarySeries {
+  id: string;
+  name: string;
+}
+
+export interface DraftAssignmentSummary {
+  metrics: {
+    participatingLabCount: number;
+    interventionDraftedCount: number;
+    lotteryDraftedCount: number;
+  };
+  chart: {
+    phases: DraftAssignmentSummaryPhase[];
+    allLabs: DraftAssignmentSummarySeries;
+    labs: DraftAssignmentSummaryLab[];
+  };
+}
+
 export interface DraftRegistrationAllowlistEntry extends Pick<
   schema.DraftRegistrationAllowlist,
   'draftId' | 'studentUserId' | 'createdAt' | 'adminUserId'

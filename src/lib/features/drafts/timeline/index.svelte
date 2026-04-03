@@ -5,7 +5,7 @@
   import { Button } from '$lib/components/ui/button';
   import type {
     Draft,
-    DraftAssignmentCountByAttribute,
+    DraftAssignmentSummary,
     DraftLabQuotaSnapshot,
     Lab,
   } from '$lib/features/drafts/types';
@@ -43,7 +43,7 @@
     allowlistCount: number;
     lateRegistrantsCount: number;
     timelineData: TimelineData[];
-    assignmentCountsByAttribute: DraftAssignmentCountByAttribute[];
+    assignmentSummary: DraftAssignmentSummary;
   }
 
   const {
@@ -56,7 +56,7 @@
     allowlistCount,
     lateRegistrantsCount,
     timelineData,
-    assignmentCountsByAttribute,
+    assignmentSummary,
   }: Props = $props();
   const draftId = $derived(rawDraftId.toString());
 
@@ -194,10 +194,8 @@
           {draftId}
           {draft}
           totalStudents={studentCount}
-          totalParticipatingLabs={snapshots.length}
-          {labs}
+          {assignmentSummary}
           isReview={currentPhase === 'review'}
-          {assignmentCountsByAttribute}
         />
       </Step>
     {/if}
