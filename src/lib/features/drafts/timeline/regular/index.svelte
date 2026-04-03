@@ -83,14 +83,14 @@
           >Review undrafted students available for selection.</span
         >
         <div class="flex min-h-0 grow flex-col overflow-y-auto px-4 pb-4">
-          <AvailableLoader {draftId} />
+          <AvailableLoader {draftId}>No available draftees.</AvailableLoader>
         </div>
       {:else if selectedView === 'drafted'}
         <span class="text-sm text-muted-foreground"
           >Review students who have already been assigned.</span
         >
         <div class="flex min-h-0 grow flex-col overflow-y-auto px-4 pb-4">
-          <DraftedLoader {draftId} />
+          <DraftedLoader {draftId}>No drafted students yet.</DraftedLoader>
         </div>
       {/if}
     {/if}
