@@ -1,15 +1,15 @@
 <script lang="ts">
+  import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
   import FlaskConicalIcon from '@lucide/svelte/icons/flask-conical';
   import GraduationCapIcon from '@lucide/svelte/icons/graduation-cap';
   import PaperclipIcon from '@lucide/svelte/icons/paperclip';
-  import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 
-  import * as Tabs from '$lib/components/ui/tabs';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-  import { Button } from '$lib/components/ui/button';
+  import * as Tabs from '$lib/components/ui/tabs';
   import AvailableLoader from '$lib/features/drafts/draftees/available/loader.svelte';
   import DraftedLoader from '$lib/features/drafts/draftees/drafted/loader.svelte';
   import SystemLogsLoader from '$lib/features/drafts/system-logs/loader.svelte';
+  import { Button } from '$lib/components/ui/button';
   import type { Lab } from '$lib/features/drafts/types';
 
   import LabRoundSummary from './lab-round-summary.svelte';
