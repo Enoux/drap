@@ -90,6 +90,59 @@ async function expectVisibleButtons(page: Page, labels: string[]) {
     await expect(page.getByRole('button', { name: label }).first()).toBeVisible();
 }
 
+function getRegularStudentsPanel(page: Page) {
+  return page.getByRole('tabpanel', { name: 'Registered Students' });
+}
+
+function getRegularStudentsViewTrigger(page: Page) {
+  return getRegularStudentsPanel(page)
+    .getByRole('button', { name: /Pending Selection|Already Drafted/u })
+    .first();
+}
+
+async function expectRegularStudentsViewOptions(
+  page: Page,
+  currentView: 'Pending Selection' | 'Already Drafted',
+) {
+  const trigger = getRegularStudentsViewTrigger(page);
+  await expect(trigger).toBeVisible();
+  await expect(trigger).toHaveText(currentView);
+
+  await trigger.click();
+  await expect(page.getByRole('menuitem', { name: 'Pending Selection' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Already Drafted' })).toBeVisible();
+  await page.keyboard.press('Escape');
+}
+
+async function selectRegularStudentsView(
+  page: Page,
+  view: 'Pending Selection' | 'Already Drafted',
+) {
+  const trigger = getRegularStudentsViewTrigger(page);
+  await expect(trigger).toBeVisible();
+
+  if ((await trigger.textContent())?.trim() === view) return;
+
+  await trigger.click();
+  await page.getByRole('menuitem', { name: view }).click();
+  await expect(trigger).toHaveText(view);
+}
+
+async function expectRegularStudentsContents(
+  page: Page,
+  view: 'Pending Selection' | 'Already Drafted',
+  expectedVisible: (string | RegExp)[],
+  expectedHidden: (string | RegExp)[] = [],
+) {
+  await selectRegularStudentsView(page, view);
+
+  const panel = getRegularStudentsPanel(page);
+  await expect(panel).toBeVisible();
+
+  for (const value of expectedVisible) await expect(panel).toContainText(value);
+  for (const value of expectedHidden) await expect(panel).not.toContainText(value);
+}
+
 async function expectSheetContents(
   page: Page,
   triggerName: string,
@@ -818,53 +871,59 @@ test.describe('Draft Lifecycle', () => {
   test.describe('Round 1 — 1st choice', () => {
     test('admin draft page shows regular loader labels', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/drafts/1/');
-      await expectVisibleButtons(adminPage, ['Pending Selection', 'Already Drafted']);
+      await expectRegularStudentsViewOptions(adminPage, 'Pending Selection');
+      await selectRegularStudentsView(adminPage, 'Already Drafted');
+      await expectRegularStudentsViewOptions(adminPage, 'Already Drafted');
 
       await adminPage.getByRole('tab', { name: 'Laboratories' }).click();
       await expectVisibleButtons(adminPage, ['Members', 'Preferred', 'Interested']);
     });
 
-    test('pending selection does not fetch before the sheet opens', async ({ adminPage }) => {
-      const noResponseBeforeOpen = adminPage.waitForResponse(
+    test('pending selection fetches on initial page load', async ({ adminPage }) => {
+      const initialResponse = adminPage.waitForResponse(
+        response => new URL(response.url()).pathname === '/dashboard/drafts/1/draftees',
+      );
+
+      await adminPage.goto('/dashboard/drafts/1/');
+      await initialResponse;
+      await expectRegularStudentsViewOptions(adminPage, 'Pending Selection');
+    });
+
+    test('switching to already drafted does not refetch after initial load', async ({
+      adminPage,
+    }) => {
+      const initialResponse = adminPage.waitForResponse(
+        response => new URL(response.url()).pathname === '/dashboard/drafts/1/draftees',
+      );
+
+      await adminPage.goto('/dashboard/drafts/1/');
+      await initialResponse;
+
+      const noResponseOnSwitch = adminPage.waitForResponse(
         response => new URL(response.url()).pathname === '/dashboard/drafts/1/draftees',
         { timeout: 1000 },
       );
-
-      await adminPage.goto('/dashboard/drafts/1/');
-      await expectVisibleButtons(adminPage, ['Pending Selection']);
-      await adminPage.waitForLoadState('networkidle');
-      await expect(noResponseBeforeOpen).rejects.toThrow();
+      await selectRegularStudentsView(adminPage, 'Already Drafted');
+      await expect(noResponseOnSwitch).rejects.toThrow();
     });
 
-    test('pending selection fetches when the sheet opens', async ({ adminPage }) => {
-      await adminPage.goto('/dashboard/drafts/1/');
-      await expectVisibleButtons(adminPage, ['Pending Selection']);
-      const firstResponsePromise = adminPage.waitForResponse(
+    test('switching back to pending selection does not refetch after initial load', async ({
+      adminPage,
+    }) => {
+      const initialResponse = adminPage.waitForResponse(
         response => new URL(response.url()).pathname === '/dashboard/drafts/1/draftees',
       );
-      await adminPage.getByRole('button', { name: 'Pending Selection' }).click();
-      await firstResponsePromise;
-    });
 
-    test('pending selection does not refetch when the sheet reopens', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/drafts/1/');
-      await expectVisibleButtons(adminPage, ['Pending Selection']);
+      await initialResponse;
+      await selectRegularStudentsView(adminPage, 'Already Drafted');
 
-      const firstResponsePromise = adminPage.waitForResponse(
-        response => new URL(response.url()).pathname === '/dashboard/drafts/1/draftees',
-      );
-      await adminPage.getByRole('button', { name: 'Pending Selection' }).click();
-      await firstResponsePromise;
-
-      await adminPage.keyboard.press('Escape');
-      await adminPage.waitForLoadState('networkidle');
-
-      const noResponseOnReopen = adminPage.waitForResponse(
+      const noResponseOnSwitch = adminPage.waitForResponse(
         response => new URL(response.url()).pathname === '/dashboard/drafts/1/draftees',
         { timeout: 1000 },
       );
-      await adminPage.getByRole('button', { name: 'Pending Selection' }).click();
-      await expect(noResponseOnReopen).rejects.toThrow();
+      await selectRegularStudentsView(adminPage, 'Pending Selection');
+      await expect(noResponseOnSwitch).rejects.toThrow();
     });
 
     test.describe('NDSL', () => {
@@ -1149,13 +1208,13 @@ test.describe('Draft Lifecycle', () => {
     test('draft is now in Round 2', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/drafts/1/');
       await expect(adminPage.getByText(/Round 2/u)).toBeVisible();
-      await expectSheetContents(
+      await expectRegularStudentsContents(
         adminPage,
         'Already Drafted',
         [/202012345/u, /202012346/u],
         [/202012349/u, /202012348/u],
       );
-      await expectSheetContents(
+      await expectRegularStudentsContents(
         adminPage,
         'Pending Selection',
         [/202012349/u, /202012348/u, /202012350/u],
@@ -1369,7 +1428,7 @@ test.describe('Draft Lifecycle', () => {
     test('draft is now in Round 3', async ({ adminPage }) => {
       await adminPage.goto('/dashboard/drafts/1/');
       await expect(adminPage.getByText(/Round 3/u)).toBeVisible();
-      await expectSheetContents(
+      await expectRegularStudentsContents(
         adminPage,
         'Already Drafted',
         [/202012345/u, /202012346/u, /202012349/u],
