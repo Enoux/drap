@@ -2,12 +2,18 @@
   import FlaskConicalIcon from '@lucide/svelte/icons/flask-conical';
   import GraduationCapIcon from '@lucide/svelte/icons/graduation-cap';
   import PaperclipIcon from '@lucide/svelte/icons/paperclip';
+  import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 
   import * as Tabs from '$lib/components/ui/tabs';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
   import { Button } from '$lib/components/ui/button';
+  
   import AvailableDraftees from '$lib/features/drafts/draftees/available/index.svelte';
+  import AvailableLoader from '$lib/features/drafts/draftees/available/loader.svelte';
+  
   import DraftedDraftees from '$lib/features/drafts/draftees/drafted/index.svelte';
+  import DraftedLoader from '$lib/features/drafts/draftees/drafted/loader.svelte';
+
   import SystemLogsLoader from '$lib/features/drafts/system-logs/loader.svelte';
   import type { Lab } from '$lib/features/drafts/types';
 
@@ -26,6 +32,7 @@
 
   let group: TabType = $state('students');
   let selectedView = $state<'pending' | 'drafted'>('pending');
+  let dropdownOpen = $state(false);
 </script>
 
 <Tabs.Root
@@ -52,7 +59,7 @@
   </div>
   <Tabs.Content value="students">
     <div class="mb-2">
-      <DropdownMenu.Root>
+      <DropdownMenu.Root bind:open={dropdownOpen}>
         <DropdownMenu.Trigger>
           {#snippet child({ props })}
             <Button
@@ -60,6 +67,9 @@
               variant="outline"
               class="bg-background hover:bg-accent dark:bg-input dark:hover:bg-input/80"
             >
+              <ChevronDownIcon
+                class="size-4 text-muted-foreground transition-transform {dropdownOpen ? 'rotate-180' : ''}"
+              />
               {selectedView === 'pending'
                 ? 'Pending Selection'
                 : 'Already Drafted'}
@@ -78,11 +88,9 @@
     </div>
 
     {#if selectedView === 'pending'}
-      <AvailableDraftees {draftId} variant="pending-selection"
-        >No available draftees.</AvailableDraftees
-      >
+      <AvailableLoader {draftId} />
     {:else if selectedView === 'drafted'}
-      <DraftedDraftees {draftId}>No drafted students yet.</DraftedDraftees>
+      <DraftedLoader {draftId} />
     {/if}
   </Tabs.Content>
   <Tabs.Content value="labs" class="min-w-0 overflow-auto">
