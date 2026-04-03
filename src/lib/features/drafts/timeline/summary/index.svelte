@@ -6,12 +6,7 @@
   import * as Alert from '$lib/components/ui/alert';
   import * as Card from '$lib/components/ui/card';
   import DraftAssignments from '$lib/features/drafts/assignments/index.svelte';
-  import type {
-    Draft,
-    DraftAssignmentCountByAttribute,
-    DraftLabQuotaSnapshot,
-    Lab,
-  } from '$lib/features/drafts/types';
+  import type { Draft, DraftAssignmentCountByAttribute, Lab } from '$lib/features/drafts/types';
 
   import DraftRoundsChart from './draft-rounds-chart.svelte';
 
@@ -19,8 +14,8 @@
     draftId: string;
     draft: Pick<Draft, 'activePeriodStart' | 'activePeriodEnd' | 'maxRounds'>;
     totalStudents: number;
+    totalParticipatingLabs: number;
     labs: Lab[];
-    snapshots: DraftLabQuotaSnapshot[];
     isReview: boolean;
     assignmentCountsByAttribute: DraftAssignmentCountByAttribute[];
   }
@@ -29,12 +24,11 @@
     draftId,
     draft,
     totalStudents,
+    totalParticipatingLabs,
     labs,
-    snapshots,
     isReview,
     assignmentCountsByAttribute,
   }: Props = $props();
-  const participatingLabs = $derived(snapshots.length > 0 ? snapshots.length : labs.length);
   const interventionDraftedCount = $derived(
     assignmentCountsByAttribute
       .filter(({ round }) => round !== null && round === draft.maxRounds + 1)
@@ -84,7 +78,7 @@
       <Card.Header>
         <Card.Title class="text-md font-semibold tabular-nums">Participating Labs</Card.Title>
         <Card.Title id="stat-participating-labs" class="text-4xl font-semibold tabular-nums">
-          {participatingLabs}
+          {totalParticipatingLabs}
         </Card.Title>
       </Card.Header>
       <Card.Footer class="flex-col items-start gap-1.5 text-sm">

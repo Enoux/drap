@@ -194,8 +194,8 @@
           {draftId}
           {draft}
           totalStudents={studentCount}
+          totalParticipatingLabs={snapshots.length}
           {labs}
-          {snapshots}
           isReview={currentPhase === 'review'}
           {assignmentCountsByAttribute}
         />
