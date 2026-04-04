@@ -10,7 +10,6 @@
   import * as Card from '$lib/components/ui/card';
   import * as Chart from '$lib/components/ui/chart';
   import * as NativeSelect from '$lib/components/ui/native-select';
-  import { Badge } from '$lib/components/ui/badge';
   import type { DraftAssignmentSummary } from '$lib/features/drafts/types';
 
   interface Props {
@@ -64,15 +63,15 @@
   });
 
   const chartTitle = $derived.by(() => {
-    if (chartMode === 'assigned') return 'Students assigned';
-    if (selectedLabId === '') return 'Students not yet assigned';
-    return 'Labs remaining quota';
+    if (chartMode === 'assigned') return 'Students Assigned';
+    if (selectedLabId === '') return 'Students Not Yet Assigned';
+    return 'Labs Remaining Quota';
   });
 
   const activeMetricLabel = $derived.by(() => {
     if (chartMode === 'assigned') return 'Assigned';
-    if (selectedLabId === '') return 'Not yet assigned';
-    return 'Remaining quota';
+    if (selectedLabId === '') return 'Not Yet Assigned';
+    return 'Remaining Quota';
   });
 
   const { chartMotion, axisMotion } = $derived<{
@@ -104,14 +103,7 @@
   <Card.Header class="gap-5">
     <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
       <div class="space-y-1.5 lg:grow">
-        <div class="flex flex-wrap items-center gap-2">
-          <Card.Title id="draft-rounds-chart-title">{chartTitle} per phase</Card.Title>
-          {#if typeof selectedLab === 'undefined'}
-            <Badge id="draft-rounds-chart-lab-badge" variant="default">All Labs</Badge>
-          {:else}
-            <Badge id="draft-rounds-chart-lab-badge" variant="secondary">{selectedLab.name}</Badge>
-          {/if}
-        </div>
+        <Card.Title id="draft-rounds-chart-title">{chartTitle} per Phase</Card.Title>
         <Card.Description>
           Visualizes student assignments or remaining lab quota across draft phases.
         </Card.Description>
@@ -147,7 +139,7 @@
           color: 'var(--primary)',
         },
       }}
-      class="min-h-70 w-full"
+      class="max-h-70 w-full"
     >
       <AreaChart
         data={chartPoints}

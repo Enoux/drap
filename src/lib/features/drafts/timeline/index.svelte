@@ -7,6 +7,7 @@
     Draft,
     DraftAssignmentSummary,
     DraftLabQuotaSnapshot,
+    DraftSummaryChartData,
     Lab,
   } from '$lib/features/drafts/types';
   import { resolve } from '$app/paths';
@@ -44,6 +45,7 @@
     lateRegistrantsCount: number;
     timelineData: TimelineData[];
     assignmentSummary: DraftAssignmentSummary;
+    draftSummaryChartData: DraftSummaryChartData;
   }
 
   const {
@@ -57,6 +59,7 @@
     lateRegistrantsCount,
     timelineData,
     assignmentSummary,
+    draftSummaryChartData,
   }: Props = $props();
   const draftId = $derived(rawDraftId.toString());
 
@@ -195,6 +198,7 @@
           {draft}
           totalStudents={studentCount}
           {assignmentSummary}
+          {draftSummaryChartData}
           isReview={currentPhase === 'review'}
         />
       </Step>

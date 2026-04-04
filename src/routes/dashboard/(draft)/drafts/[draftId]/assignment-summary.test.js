@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildDraftAssignmentSummary } from './assignment-summary.server';
+import { buildDraftAssignmentSummary } from './assignment-summary';
 
 describe('buildDraftAssignmentSummary', () => {
   it('builds zero-filled phase series and aggregate metrics from grouped assignment rows', () => {
