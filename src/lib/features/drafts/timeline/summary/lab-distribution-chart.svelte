@@ -58,7 +58,14 @@
   </Card.Header>
   <Card.Content>
     <Chart.Container config={chartConfig} class="max-h-70 w-full">
-      <PieChart data={chartData} key="key" value="value" label="label" c="color" legend>
+      <PieChart
+        data={chartData}
+        key="key"
+        value="value"
+        label="label"
+        c="color"
+        legend={{ orientation: 'vertical', placement: 'right' }}
+      >
         {#snippet tooltip()}
           <Chart.Tooltip
             indicator="dot"

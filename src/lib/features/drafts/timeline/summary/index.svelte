@@ -55,7 +55,7 @@
   <div class="space-y-4">
     <DraftRoundsChart chart={assignmentSummary.chart} />
     <SupplyDemandChart data={draftSummaryChartData.supplyVsDemand} />
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <LabDistributionChart data={draftSummaryChartData.labDistribution} />
       <PreferenceAlignmentChart data={draftSummaryChartData.preferenceAlignment} />
     </div>

@@ -62,15 +62,13 @@
         label="label"
         c="color"
         innerRadius={0.6}
-        legend
+        legend={{ orientation: 'vertical', placement: 'right' }}
       >
         {#snippet tooltip()}
           <Chart.Tooltip indicator="dot" hideLabel />
         {/snippet}
       </PieChart>
-      <div
-        class="pointer-events-none absolute inset-0 mb-12 flex flex-col items-center justify-center"
-      >
+      <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
         <span class="text-3xl font-bold tabular-nums">{percentFormat(data.bordaScore)}</span>
         <span class="text-xs text-muted-foreground">Borda Score</span>
       </div>
