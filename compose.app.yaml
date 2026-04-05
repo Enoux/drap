@@ -59,6 +59,7 @@ services:
     ports:
       - 3000:3000
     environment:
+      DRAP_ASSERT_DOMAIN: up.edu.ph
       DRAP_ENABLE_EMAILS: 1
       DRAP_ENCRYPTION_KEY: ${DRAP_ENCRYPTION_KEY:?required}
       ORIGIN: ${ORIGIN:?required}

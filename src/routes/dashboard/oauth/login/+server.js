@@ -2,6 +2,7 @@ import { addMinutes } from 'date-fns';
 import { error, redirect } from '@sveltejs/kit';
 
 import * as GOOGLE from '$lib/server/env/google';
+import { ASSERT_DOMAIN } from '$lib/server/env/drap/oauth';
 import { Logger } from '$lib/server/telemetry/logger';
 import { OAUTH_SCOPE_STRING, SENDER_SCOPE_STRING } from '$lib/server/models/oauth';
 
@@ -47,10 +48,11 @@ export function GET({ locals: { session }, cookies, setHeaders, url: { searchPar
     client_id: GOOGLE.OAUTH_CLIENT_ID,
     redirect_uri: GOOGLE.OAUTH_REDIRECT_URI,
     nonce,
-    hd: 'up.edu.ph',
     response_type: 'code',
     prompt: 'select_account',
   });
+
+  if (typeof ASSERT_DOMAIN !== 'undefined') params.set('hd', ASSERT_DOMAIN);
 
   if (hasExtendedScope) {
     // https://github.com/googleapis/google-api-python-client/issues/213

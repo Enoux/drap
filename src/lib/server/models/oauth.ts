@@ -72,7 +72,7 @@ export const IdToken = object({
   // Access token hash.
   at_hash: string(),
   // The domain associated with the Google Workspace or Cloud organization of the user.
-  hd: literal('up.edu.ph'),
+  hd: optional(string()),
   email: pipe(string(), email()),
   email_verified: boolean(),
   given_name: optional(string(), ''),
