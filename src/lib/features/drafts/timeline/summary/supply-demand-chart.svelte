@@ -39,7 +39,7 @@
     <Card.Title class="flex items-center gap-1.5">
       <span>Proportional Supply versus Demand versus Actual</span>
       <Popover.Root>
-        <Popover.Trigger class="leading-none">
+        <Popover.Trigger class="leading-none transition hover:opacity-80">
           <CircleHelpIcon class="size-3.5 text-muted-foreground" />
         </Popover.Trigger>
         <Popover.Content class="max-w-xs space-y-2 text-sm font-normal">

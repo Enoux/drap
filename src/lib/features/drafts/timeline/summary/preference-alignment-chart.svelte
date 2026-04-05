@@ -57,7 +57,7 @@
     <Card.Title class="flex items-center gap-1.5">
       <span>Preference Alignment</span>
       <Popover.Root>
-        <Popover.Trigger class="leading-none">
+        <Popover.Trigger class="leading-none transition hover:opacity-80">
           <CircleHelpIcon class="size-3.5 text-muted-foreground" />
         </Popover.Trigger>
         <Popover.Content class="text-sm font-normal">
@@ -106,7 +106,7 @@
         <div class="flex items-center gap-1 text-xs text-muted-foreground">
           <span>Borda Score</span>
           <Popover.Root>
-            <Popover.Trigger class="pointer-events-auto">
+            <Popover.Trigger class="pointer-events-auto transition hover:opacity-80">
               <CircleHelpIcon class="size-3.5" />
             </Popover.Trigger>
             <Popover.Content class="pointer-events-auto max-w-xs space-y-2 text-sm">
