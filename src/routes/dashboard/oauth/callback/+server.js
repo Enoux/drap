@@ -86,6 +86,15 @@ export async function GET({ fetch, cookies, setHeaders, url: { searchParams } })
         error(500, 'Email not verified.');
       }
 
+      if (typeof ASSERT_DOMAIN !== 'undefined')
+        if (token.hd !== ASSERT_DOMAIN) {
+          logger.fatal('hd claim mismatch', void 0, {
+            'google.hd': token.hd,
+            'expected.hd': ASSERT_DOMAIN,
+          });
+          error(500, `Invalid hosted domain. Expected ${ASSERT_DOMAIN}.`);
+        }
+
       // Validate UP email address
       const email = addresses.parseOneAddress(token.email);
       if (email === null) {
